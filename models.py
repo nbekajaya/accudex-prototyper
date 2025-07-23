@@ -3,6 +3,7 @@ import numpy as np
 from drawer import EasyDrawer
 from style import *
 from toolbox import Toolbox as toolbox
+from copy import deepcopy
 
 
 # Template landmarking stuff
@@ -62,6 +63,22 @@ class CustomLandmark:
 class ModelIndices:
     HAND_MODEL = 0
     POSE_MODEL = 1
+
+class AlternateLandmarks:
+    DRESIO = {
+        13:'11,12 0.5 mid shoulder',
+        16:'11,13 0.5 left upper arm',
+        17:'12,14 0.5 right upper arm',
+        20:'13,15 0.5 left forearm',
+        21:'14,16 0.5 right forearm',
+        30:'23,24 0.5 mid hip',
+        33:'23,25 0.5 left thigh',
+        34:'24,26 0.5 right thigh',
+        37:'25,27 0.5 left calf',
+        38:'26,28 0.5 right calf',
+        39:'29,30,31,32 0.25,0.25,0.25 mid feet',
+        40:'11,12,23,24 0.15,0.15,0.35 navel'
+    }
 
 class LandmarkConnections:
     HAND_LANDMARK_CONNECTIONS = [
@@ -187,7 +204,7 @@ class LandmarkContainer:
     """
     def __init__(self, 
                  model:int,
-                 options:None,
+                 options=None,
                  renderer:int=EasyDrawer.PYGAME, 
                  max_data_age_ms:int = 8000):
         self.__construct_model(model)
@@ -263,10 +280,10 @@ class LandmarkContainer:
             self.HL_world = (max_world[0], max_world[1]/2 + min_world[1]/2 , max_world[2]/2 + min_world[2]/2)
 
         except Exception as e:
-            print(e) 
+            # print(e) 
             pass
 
-        self.landmark_list = self.default_landmark_list.copy()
+        self.landmark_list = deepcopy(self.default_landmark_list)
         self.data_storage.append(self.landmark_list)
 
         if self.timestamp_storage[0] <= timestamp_ms-self.max_data_age_ms:
@@ -294,11 +311,11 @@ class LandmarkContainer:
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv_image)
         self.detector.detect_async(mp_image, timestamp_ms)
 
-    def set_display(self, image, renderer:int=EasyDrawer.PYGAME):
+    def set_display(self, image, flip=False):
         '''
         Sets screen information for screen marker position display
         '''
-        self.renderer.set_image(image)
+        self.renderer.set_image(image, flip)
         self.image_info = self.renderer.image_info
 
     def calibrate(self):
@@ -361,7 +378,7 @@ class LandmarkContainer:
         returns:
          updates the landmark_list
         '''
-        self.landmark_connections = [x[:] for x in self.default_landmark_connections]
+        self.landmark_connections = deepcopy(self.default_landmark_connections)
         for insert_index, instruction in landmark_dict.items():
             for group_idx, group in enumerate(self.landmark_list):
                 group.insert(insert_index, 
@@ -512,7 +529,8 @@ class LandmarkContainer:
              information = None, 
              indices = True, 
              attributes = 'index name screen_coor world_coor local_coor',
-             connector = 'line'):
+             connector = 'line',
+             flipped:bool=True):
         """
         Draws information on the screen set by set_display
 
@@ -591,6 +609,15 @@ class LandmarkContainer:
 
         except ValueError as e:
             pass
+
+        except IndexError as e:
+            pass
+
+        if flipped:
+            self.renderer.flip_render()
+
+        return self.renderer.image
+        
 
     def sanitise_arguments(self, instruction:str, arguments:tuple|list, space:str):
         def determine_factor(primitive:str):

@@ -5,7 +5,7 @@ import style
 import cv2 as cv
 from drawer import EasyDrawer
 from camera_stream import Stream
-from models import ModelIndices, LandmarkContainer
+from models import ModelIndices, LandmarkContainer, AlternateLandmarks
 
 screen_width, screen_height = screen_util.get_screen_info()
 camera = Stream()
@@ -54,30 +54,30 @@ while running:
     use_image = next(feed)
     current_time = int(time.time()*1000)
 
-    # hand0.detect_async(use_image, current_time)
+    
+
+    hand0.detect_async(use_image, current_time)
     pose0.detect_async(use_image, current_time)
 
-    use_image=cv.flip(use_image,1)
-    
-    #hand0.flip_axes('x')
-    pose0.flip_axes('x')
+    use_image = cv.flip(use_image, 1) #flips image
 
     pose0.reorder_landmarks(
-        {13:'11,12 0.5 mid shoulder',
-         16:'11,'}
+       AlternateLandmarks.DRESIO
     )
-
-    drawer.set_image(use_image)
-    # hand0.set_display(use_image)
-    pose0.set_display(use_image)
+    
+    hand0.flip_axes('x')
+    pose0.flip_axes('x')
 
     current_time = int(time.time()*1000)
-    # print(pose0.landmark_connections)
 
-    # hand0.draw(current_time, connector='bone')
+    drawer.set_image(use_image)
+    pose0.set_display(use_image)
+    hand0.set_display(use_image)
+
     pose0.draw(current_time,connector='line')
-
-    drawer.render_text(pose0.landmark_connections)
+    hand0.draw(current_time, connector='bone')
+    
+    # drawer.render_text(pose0.landmark_connections)
 
     # hand0.measure('distance world \'xy\' 0 4,20 -')
     # drawer.render_text(hand0.measured, (0,400))

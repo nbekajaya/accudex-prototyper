@@ -3,12 +3,12 @@ import time
 import style
 from camera_stream import Stream
 from drawer import EasyDrawer
-from models import HandLandmarkContainer, PoseLandmarkContainer
+from models import ModelIndices, LandmarkContainer, AlternateLandmarks
 
 
 pygame.init()
 window_width, window_height = 0,0
-screen = pygame.display.set_mode((window_width,window_height), vsync=1)
+screen = pygame.display.set_mode((window_width,window_height), flags=pygame.RESIZABLE, vsync=1)
 clock = pygame.time.Clock()
 running = True
 
@@ -20,7 +20,8 @@ def convert_cv_to_pygame(cv_image):
 camera = Stream()
 drawer = EasyDrawer(EasyDrawer.PYGAME)
 feed = camera.stream()
-hand0 = HandLandmarkContainer()
+pose = LandmarkContainer(ModelIndices.POSE_MODEL, renderer = EasyDrawer.CV)
+hand = LandmarkContainer(ModelIndices.HAND_MODEL, renderer = EasyDrawer.CV)
 
 while running:
     # poll for events
@@ -33,11 +34,23 @@ while running:
             if event.key == pygame.K_q:
                 running = False
 
-    feed_image = next(feed)
-    hand0.detect_async(feed_image, q:=int(1000*time.time()))
-    current_window_size = pygame.display.get_window_size()
+    use_image = next(feed)
+    pose.detect_async(use_image, q:=int(1000*time.time()))
+    hand.detect_async(use_image, q)
 
-    use_image = convert_cv_to_pygame(feed_image)
+    pose.reorder_landmarks(AlternateLandmarks.DRESIO)
+
+    pose.flip_axes('x')
+    hand.flip_axes('x')
+
+    pose.set_display(use_image, flip=True)    
+    use_image = pose.draw(q, flipped=True)
+    hand.set_display(use_image, flip=True)
+    use_image = hand.draw(q, connector='bone', flipped=True)
+
+    use_image = convert_cv_to_pygame(use_image)
+
+    current_window_size = pygame.display.get_window_size()
     use_image = pygame.transform.scale(use_image, current_window_size)
     use_image = pygame.transform.flip(use_image, 1, 0)
 
@@ -46,18 +59,17 @@ while running:
     
     # RENDER YOUR GAME HERE
     drawer.set_image(screen)
-    hand0.set_display(screen)
-    hand0.flip_axes('x')
-    hand0.draw(int(time.time()*1000))
 
     # flip() the display to put your work on screen
     pygame.display.flip()
 
-    clock.tick(60)  # limits FPS to 60
+    clock.tick(30)  # limits FPS to 60
 
 camera.stop_stream()
-hand0.close()
-with open(f'Storage.txt','w') as text:
-    for timestamp, data in zip(hand0.timestamp_storage, hand0.data_storage):
-        text.write(f'[{timestamp},{data}]\n')
+pose.close()
+hand.close()
+
+# with open(f'Storage.txt','w') as text:
+#     for timestamp, data in zip(hand0.timestamp_storage, hand0.data_storage):
+#         text.write(f'[{timestamp},{data}]\n')
 pygame.quit()

@@ -20,7 +20,7 @@ class EasyDrawer:
 
         self.renderer_index = renderer
         
-    def set_image(self, image):
+    def set_image(self, image, flip = False):
         self.image = image
         self.positions, self.counters = [],[]
 
@@ -28,6 +28,9 @@ class EasyDrawer:
             self.image_info = image.get_size()
         if self.renderer_index==EasyDrawer.CV:
             self.image_info = image.shape[-2::-1]
+
+        if flip:
+            self.flip_render()
 
         self.image_center = [el//2 for el in self.image_info]
         self.image_top_left = [0,0]
@@ -106,7 +109,6 @@ class EasyDrawer:
                         color2:tuple=None):
         renderer = self.renderer    
 
-
         if color2 is None:
             color2=color1
 
@@ -136,5 +138,12 @@ class EasyDrawer:
         self.render_line(p1, p4, color, thickness)
         self.render_line(p3, p2, color, thickness)
         self.render_line(p4, p2, color, thickness)
+    
+    def flip_render(self):
+        renderer = self.renderer
+        if self.renderer_index == EasyDrawer.PYGAME:
+            self.image = renderer.transform.flip(self.image, 1, 0)
+        if self.renderer_index == EasyDrawer.CV:
+            self.image = renderer.flip(self.image, 1)
 
 
