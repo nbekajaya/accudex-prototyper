@@ -18,7 +18,7 @@ class Stream:
             status, frame = self.camera.read()
             if not status:
                 raise RuntimeError("Camera fails to capture frame")
-            yield cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+            yield cv.resize(cv.cvtColor(frame, cv.COLOR_BGR2RGB), None, None, 1, 1)
         
     def stop_stream(self):
         self.camera.release()

@@ -4,6 +4,7 @@ from drawer import EasyDrawer
 from style import *
 from toolbox import Toolbox as toolbox
 from copy import deepcopy
+from pygame import Surface
 
 
 # Template landmarking stuff
@@ -29,9 +30,11 @@ class CustomLandmark:
     def __init__(self,
                  screen:list[float], 
                  world:list[float],  
+                 idx:int,
                  name:str, 
                  side:str=''):
         self.name = name 
+        self.idx = idx
         self.side = side
 
         try:
@@ -76,9 +79,23 @@ class AlternateLandmarks:
         34:'24,26 0.5 right thigh',
         37:'25,27 0.5 left calf',
         38:'26,28 0.5 right calf',
+    }
+
+    NAT_CUSTOM = {
         39:'29,30,31,32 0.25,0.25,0.25 mid feet',
         40:'11,12,23,24 0.15,0.15,0.35 navel'
     }
+
+    TORSO_CENTER = {
+        41:'11,12,23,24 0.25,0.25,0.25 average torso',
+        42:'11,12,23,24 0.3,0.3,0.2 weighted average'
+    }
+
+    SPINE = {
+        43:'11,12,23,24 0.3,0.3,0.2 spine 1',
+        44:'11,12,23,24 0.2,0.2,0.3 spine 2',
+    }
+
 
 class LandmarkConnections:
     HAND_LANDMARK_CONNECTIONS = [
@@ -204,9 +221,21 @@ class LandmarkContainer:
     """
     def __init__(self, 
                  model:int,
-                 options=None,
+                 options:None|dict=None,
                  renderer:int=EasyDrawer.PYGAME, 
                  max_data_age_ms:int = 8000):
+        '''
+        Initialiser for landmark container
+
+        Params:
+         - model(int): the enumeration index of the model accessed by ModelIndices
+         - options(None|dict): options for the mediapipe landmarking model
+         - renderer(int): the enumeration index of the renderer accessed by EasyDrawer
+         - max_data_age_ms(int): the maximum age of landmark_list in data_storage
+
+        Returns:
+         None, creates the container
+        '''
         self.__construct_model(model)
 
         if options is None:
@@ -236,6 +265,7 @@ class LandmarkContainer:
         
         self.data_storage = []
         self.landmark_list = []
+        self.landmark_indices = []
         self.timestamp_storage = []
 
     def __do_callback(self, result, output_image, timestamp_ms):
@@ -266,6 +296,7 @@ class LandmarkContainer:
                         screen=screen_mark,
                         world=world_mark,
                         name=self.landmark_names[idx],
+                        idx=idx,
                         side=display_name
                     )
                     for idx, (screen_mark, world_mark) in enumerate(zip(screen_mark_list, world_mark_list))
@@ -284,6 +315,12 @@ class LandmarkContainer:
             pass
 
         self.landmark_list = deepcopy(self.default_landmark_list)
+        try:
+            self.default_landmark_indices = [landmark.idx for landmark in self.landmark_list[0]]
+        except IndexError:
+            self.default_landmark_indices = []
+
+        self.landmark_indices = deepcopy(self.default_landmark_indices)
         self.data_storage.append(self.landmark_list)
 
         if self.timestamp_storage[0] <= timestamp_ms-self.max_data_age_ms:
@@ -311,27 +348,47 @@ class LandmarkContainer:
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv_image)
         self.detector.detect_async(mp_image, timestamp_ms)
 
-    def set_display(self, image, flip=False):
+    def set_display(self, image, flip:bool=False):
         '''
         Sets screen information for screen marker position display
+
+        Params:
+         - image(any)
         '''
         self.renderer.set_image(image, flip)
         self.image_info = self.renderer.image_info
 
     def calibrate(self):
+        '''
+        [NOT IMPLEMENTED]
+        Calibrates the length of connections
+        '''
+        raise NotImplementedError('Calibration is not implemenetd')
         self.local_vectors = None
         self.calibrated_length = None
 
-    def relative_displace(self, index, space='world'):
-        try:
-            new_origin = getattr(self.landmark_list[index], space)
-        except IndexError:
-            pass
-        for landmark in self.landmark_list:
-            position = getattr(landmark, space)
-            setattr(landmark, space, [element-origin 
-                                      for element, origin 
-                                      in zip(position, new_origin)])
+    def relative_displace(self, index:int, space:str='world') -> None:
+        '''
+        Sets a landmark as the origin for the rest of the landmarks
+        recalculates the position of all other landmarks in the container
+        relative to the new origin
+
+        Params:
+         - index(int): the index of the new origin landmark
+         - space(str): the space in which to recalculate, defaults to world
+        
+        Returns:
+         Non, updates the thingy
+        '''
+        landmark_indices = self.landmark_indices
+        for group in self.landmark_list:
+            new_origin = getattr(group[landmark_indices.index(index)], space)
+    
+            for landmark in group:
+                position = getattr(landmark, space)
+                setattr(landmark, space, [element-origin 
+                                            for element, origin 
+                                            in zip(position, new_origin)])
             
     def center_of_mass(self):
         for group in self.landmark_list:
@@ -339,7 +396,11 @@ class LandmarkContainer:
 
     def __new_landmark_parse(self, 
                              instruction:str, 
-                             group_idx:int) -> CustomLandmark:
+                             group_idx:int,
+                             insert_index:int) -> CustomLandmark:
+        '''
+        Parses landmark stuff
+        '''
         attributes = ['screen','world']
         attributes_dict = {}
         group = self.default_landmark_list[group_idx]
@@ -363,7 +424,7 @@ class LandmarkContainer:
             
         side = group[0].side
 
-        return CustomLandmark(**attributes_dict, name=name, side=side)
+        return CustomLandmark(**attributes_dict, name=name, side=side, idx=insert_index)
 
     def reorder_landmarks(self, landmark_dict:dict):
         '''
@@ -379,10 +440,29 @@ class LandmarkContainer:
          updates the landmark_list
         '''
         self.landmark_connections = deepcopy(self.default_landmark_connections)
+
+        try:
+            self.landmark_indices = deepcopy(self.default_landmark_indices)
+        except AttributeError:
+            return
+        
         for insert_index, instruction in landmark_dict.items():
             for group_idx, group in enumerate(self.landmark_list):
-                group.insert(insert_index, 
-                             self.__new_landmark_parse(instruction, group_idx))
+                group.append( 
+                             self.__new_landmark_parse(instruction, group_idx, insert_index))
+                
+                for landmark in group[:-1]:
+                    if landmark.idx>=insert_index:
+                        landmark.idx += 1
+
+            self.landmark_indices += [insert_index]
+            for index_ in self.landmark_indices[:-1]:
+                if index_>=insert_index:
+                    index_ += 1
+
+            
+
+
             for connection in self.landmark_connections:
                 for endpoint_idx, endpoint in enumerate(connection):
                     if endpoint>=insert_index:
@@ -399,29 +479,33 @@ class LandmarkContainer:
         '''
         make_vector, normalise_vector = toolbox.make_vector, toolbox.normalise_vector2
         cross_product = toolbox.cross_product
+        landmark_indices = self.landmark_indices
 
         try:
-            self.landmark_list[1]
+            assert len(self.landmark_list)
         except:
             return
-
-        new_basis = []
         
-        for input_ in (x_bas, y_bas):
-            if input_[0] == 'index':
-                new_basis += [normalise_vector(
-                    make_vector(*[self.landmark_list[p].world 
-                                  for p 
-                                  in input_[1:]]))]
-            if input_[0] == 'vector':
-                new_basis += [normalise_vector(input_[1:])]
+        self.new_basis = []
 
-        new_basis += [cross_product(*new_basis)]
-        self.hand_basis = new_basis
+        for group in self.landmark_list:
+            new_basis = []
+            for input_ in (x_bas, y_bas):
+                if input_[0] == 'index':
+                    new_basis += [normalise_vector(
+                        make_vector(*[group[landmark_indices.index(p)].world 
+                                    for p 
+                                    in input_[1:]]))]
+                    
+                if input_[0] == 'vector':
+                    new_basis += [normalise_vector(input_[1:])]
 
-        for landmark in self.landmark_list:
-            new_vec = np.linalg.solve(new_basis, landmark.world)
-            landmark.local_coor = list(new_vec)
+            new_basis += [cross_product(*new_basis)]
+            self.new_basis += [new_basis]
+
+            for landmark in group:
+                new_vec = np.linalg.solve(new_basis, landmark.world)
+                landmark.local_coor = list(new_vec)
 
     def flip_axes(self, axes):
         '''
@@ -592,16 +676,17 @@ class LandmarkContainer:
         
         try: # ACTUAL INFORMATION DRAWING
             for group_id, landmark_group in enumerate(self.landmark_list):
-                positions = []
+                positions = [None for i in range(len(landmark_group))]
 
-                for index_, landmark in enumerate(landmark_group):
+                for landmark in landmark_group:
+                    index_ = landmark.idx
                     drawn_index = index_ + group_id*len(landmark_group)
                     landmark_screen_position = [int(pos*dim) 
                                                 for pos, dim 
                                                 in zip(landmark.screen, self.image_info)]
                     self.__draw_landmark(landmark_screen_position)
                     self.__draw_landmark_attribute(landmark, landmark_screen_position, attributes, index_)
-                    positions.append(landmark_screen_position)
+                    positions[index_] = landmark_screen_position
                     drawn.append(drawn_index)
 
                 for endpoint1, endpoint2 in self.landmark_connections:
@@ -619,7 +704,7 @@ class LandmarkContainer:
         return self.renderer.image
         
 
-    def sanitise_arguments(self, instruction:str, arguments:tuple|list, space:str):
+    def __sanitise_arguments(self, instruction:str, arguments:tuple|list, space:str):
         def determine_factor(primitive:str):
             if 'V' in primitive:
                 return (0,1,0)
@@ -661,9 +746,9 @@ class LandmarkContainer:
                 for arg
                 in arguments]
     
-    def parse_measure(self, instruction):
+    def __parse_measure(self, instruction):
         axis_dict = dict(('x0','y1','z2','w3'))
-        sanitise_arguments = self.sanitise_arguments
+        sanitise_arguments = self.__sanitise_arguments
         function, space, axis, group_idx, indices, additional = instruction.split(' ',5)
 
         #Find measure instruction
@@ -687,15 +772,32 @@ class LandmarkContainer:
         return use_function(*arguments, axis)
             
     def measure(self,
-                *inputs):
+                *inputs:str):
+        '''
+        Measures properties using toolboxes
+
+        Accepted instructions:
+         - angle_point
+         - angle_vector
+         - displacement
+         - distance
+        
+        Look at toolbox documentation for usage info
+
+        Params:
+         - inputs(any): Accepts any arguments
+
+        Returns:
+         None, measured properties are accesible from 'measured' attribute a list
+        '''
             
         measured = []
 
         if len(self.landmark_list):
             for in_ in inputs:
-                measured += [self.parse_measure(in_)]
+                measured += [self.__parse_measure(in_)]
 
-        self.measured = measured
+        self.measured:list = measured
                 
 if __name__=='__main__':
     pass

@@ -13,6 +13,16 @@ class Toolbox:
     middle_point = lambda v1,v2:[(e1+e2)//2 for e1,e2 in zip(v1,v2)]
 
     def mask_factor(v1:tuple|list, v2:tuple|list, factors):
+        '''
+        Does 3D Cross product for 2 vectors
+
+        Params:
+         - v1(tuple|list): an interable acting as a vector
+         - v2(tuple|list): an interable acting as a vector
+
+        Returns:
+         A list acting as the cross product vector
+        '''
         new_vec = []
         if isinstance(factors, (int, float)):
             factors = [factors for i in range(len(v1))]
@@ -20,7 +30,17 @@ class Toolbox:
             new_vec += [Toolbox.lerp(factor, 0, 1, e1, e2)]
         return new_vec
 
-    def cross_product(v1,v2):
+    def cross_product(v1:tuple|list, v2:tuple|list) -> list:
+        '''
+        Does 3D Cross product for 2 vectors
+
+        Params:
+         - v1(tuple|list): an interable acting as a vector
+         - v2(tuple|list): an interable acting as a vector
+
+        Returns:
+         A list acting as the cross product vector
+        '''
         for v in (v1,v2):
             if len(v)<3:
                 v+=[0]
@@ -61,24 +81,85 @@ class Toolbox:
         v1, v2 = make_vector(p2,p1), make_vector(p2,p3)
         return angle_vector(v1, v2)
 
-    def displacement(p1, p2) -> list:
+    def displacement(p1:tuple|list, p2:tuple|list) -> list:
+        '''
+        Finds displacement between two points
+
+        Axes listed in order of:
+         - x
+         - y
+         - z
+
+        Params:
+         - p1(tuple|list): an iterable acting as a coordinate
+         - p2(tuple|list): an iterable acting as a coordinate
+        
+        Returns:
+         A list describing the displacement of the two points in order of the axess
+        '''
         make_vector = Toolbox.make_vector
         vectors = [make_vector(*[[0 if idx!=i else el for i, el in enumerate(p)] 
                     for p in (p1,p2)])
                     for idx in [0,1,2]]
         return [float(f'{vector:0.2f}' for vector in vectors)]
 
-    def distance(p1, p2) -> list:
+    def distance(p1:tuple|list, p2:tuple|list) -> list:
+        '''
+        Finds the distance between two points
+        in specified planes
+
+        Planes listed in order of:
+         - xy
+         - yz
+         - xz
+         - xyz
+
+        Params:
+         - p1(tuple|list): an iterable acting as a coordinate
+         - p2(tuple|list): an iterable acting as a coordinate
+        
+        Returns:
+         A list describing the displacement of the two points in order of the planes
+        '''
         vector_magnitude = Toolbox.vector_magnitude
         magnitudes = [vector_magnitude(*[[0 if idx==i else el for i,el in enumerate(p)]
                    for p in (p1,p2)]) 
                   for idx in [2,0,1,3]]
         return [float(f'{magnitude:0.2f}') for magnitude in magnitudes]
 
-    def compare(val1, val2):
+    def compare(val1:tuple|list, val2:tuple|list) -> list:
+        '''
+        Compares elements between two values as a ratio
+
+        Params:
+         - val1(any): A list containing values
+         - val2(any): A list containing values 
+        
+        Returns:
+         A list which are ratios of elements of val1 to elements of val 2
+        '''
+        if len(val1) != len(val2):
+            raise Exception('Incompatible comparison between lists of unequal lengths')
         return [float(f'{e1/e2:0.2f}') for e1,e2 in zip(val1, val2)]
 
-    def rotator(point, rotation_value, origin = [0,0,0]):
+    def rotator(point:tuple|list, rotation_value:tuple|list, origin:tuple|list = [0,0,0]) -> list:
+        '''
+        Rotates a point around origin using rotation_value
+        as elemental rotations
+
+        rotation_value order:
+         - x
+         - y
+         - z
+        
+        Params:
+         - point(tuple|list): An iterable acting as a coordinate; The point to be rotated
+         - rotation_value(tuple|list): An iterable that describes the elemental rotation axes
+         - origin(tuple|list): An iterable acting as a coordinate, defaults to (0,0,0); The origin of rotation
+
+        Returns:
+         A list describing the new position of the point
+        '''
         cos = np.cos
         sin = np.sin
 
