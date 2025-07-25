@@ -61,9 +61,9 @@ class Toolbox:
         dot_product = Toolbox.dot_product
         nv1, nv2 = normalise_vector(v1), normalise_vector(v2)
         angles = [np.arccos(dot_product(*[
-            [0 if idx==i else el for i,el in enumerate(vec)] 
+            Toolbox.normalise_vector2([0 if idx==i else el for i,el in enumerate(vec)]) 
             for vec in (nv1,nv2)])) * 180/np.pi
-            for idx in [0,1,2]]
+            for idx in [0,1,2,3]]
         return [float(f'{angle:0.2f}') for angle in angles]
         
     def angle_point(p1, p2, p3) -> list:
@@ -98,10 +98,8 @@ class Toolbox:
          A list describing the displacement of the two points in order of the axess
         '''
         make_vector = Toolbox.make_vector
-        vectors = [make_vector(*[[0 if idx!=i else el for i, el in enumerate(p)] 
-                    for p in (p1,p2)])
-                    for idx in [0,1,2]]
-        return [float(f'{vector:0.2f}' for vector in vectors)]
+        vector = make_vector(p1,p2)
+        return [float(f'{element:0.2f}') for element in vector]
 
     def distance(p1:tuple|list, p2:tuple|list) -> list:
         '''
@@ -122,9 +120,12 @@ class Toolbox:
          A list describing the displacement of the two points in order of the planes
         '''
         vector_magnitude = Toolbox.vector_magnitude
-        magnitudes = [vector_magnitude(*[[0 if idx==i else el for i,el in enumerate(p)]
-                   for p in (p1,p2)]) 
-                  for idx in [2,0,1,3]]
+        make_vector = Toolbox.make_vector
+        magnitudes =[vector_magnitude(
+                        make_vector(*[[0 if idx==i else el 
+                                       for i,el in enumerate(p)]
+                                    for p in (p1,p2)])) 
+                    for idx in [2,0,1,3]]
         return [float(f'{magnitude:0.2f}') for magnitude in magnitudes]
 
     def compare(val1:tuple|list, val2:tuple|list) -> list:
@@ -188,8 +189,17 @@ class Toolbox:
         
         return point
 
-    def bounding_box(*points):
-        a = list()
+    def bounding_box(points:list[list]):
+        '''
+        Returns the bounding box of points 
+
+        Params:
+         - points: a list of lists acting as coordinates
+        
+        Returns:
+         Top left and bottom right coordinates
+        '''
+        a = [zip(*points)]
         return
     
     def bounding_box_size(*points):
