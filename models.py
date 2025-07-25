@@ -61,7 +61,7 @@ class CustomLandmark:
                 self.world[2]=-self.world[2]
 
     def __repr__(self):
-        return f'{self.side}-{self.name}|screen: {self.screen}|world: {self.world}'
+        return f'{self.side}-{self.idx}-{self.name}|screen: {self.screen}|world: {self.world}'
     
 class ModelIndices:
     HAND_MODEL = 0
@@ -92,8 +92,9 @@ class AlternateLandmarks:
     }
 
     SPINE = {
-        43:'11,12,23,24 0.3,0.3,0.2 spine 1',
+        43:'11,12,23,24 0.4,0.4,0.1 spine 1',
         44:'11,12,23,24 0.2,0.2,0.3 spine 2',
+        45:'11,12,23,24 0.1,0.1,0.4 spine 3'
     }
 
 
@@ -380,8 +381,14 @@ class LandmarkContainer:
         Returns:
          Non, updates the thingy
         '''
+        try:
+            self.landmark_indices.index(index)
+        except ValueError:
+            return
+        
         landmark_indices = self.landmark_indices
         for group in self.landmark_list:
+            
             new_origin = getattr(group[landmark_indices.index(index)], space)
     
             for landmark in group:
@@ -456,9 +463,9 @@ class LandmarkContainer:
                         landmark.idx += 1
 
             self.landmark_indices += [insert_index]
-            for index_ in self.landmark_indices[:-1]:
+            for index_idx, index_ in enumerate(self.landmark_indices[:-1]):
                 if index_>=insert_index:
-                    index_ += 1
+                    self.landmark_indices[index_idx] += 1
 
             
 
@@ -550,7 +557,7 @@ class LandmarkContainer:
                   position:tuple|list, 
                   landmark_attributes:str,
                   landmark_index:int, 
-                  scale:float = 0.5):
+                  scale:float = 1):
         '''
         Draws landmark attributes as text
         
@@ -567,16 +574,16 @@ class LandmarkContainer:
 
         # Grouping of landmarks are set here
         relative_positions = [
-            (position[0],position[1]-70),
-            (position[0],position[1]-50),
-            (position[0]+60,position[1]-50),
-            (position[0]+120,position[1]-50)
+            (position[0],position[1]-90*scale),
+            (position[0],position[1]-60*scale),
+            (position[0]+70*scale,position[1]-60*scale),
+            (position[0]+140*scale,position[1]-60*scale)
         ]
 
         for_printing = []
         
         if 'index' in landmark_attributes:
-            for_printing += [(f'{landmark_index}', relative_positions[0],
+            for_printing += [(f'{landmark.idx}', relative_positions[0],
                               (35*scale,0), 0.8, FontColorBlack, 1)]
             
         if 'name' in landmark_attributes:
@@ -674,29 +681,28 @@ class LandmarkContainer:
         except:
             pass
         
-        try: # ACTUAL INFORMATION DRAWING
-            for group_id, landmark_group in enumerate(self.landmark_list):
-                positions = [None for i in range(len(landmark_group))]
+        for group_id, landmark_group in enumerate(self.landmark_list):
 
-                for landmark in landmark_group:
-                    index_ = landmark.idx
-                    drawn_index = index_ + group_id*len(landmark_group)
-                    landmark_screen_position = [int(pos*dim) 
-                                                for pos, dim 
-                                                in zip(landmark.screen, self.image_info)]
-                    self.__draw_landmark(landmark_screen_position)
-                    self.__draw_landmark_attribute(landmark, landmark_screen_position, attributes, index_)
-                    positions[index_] = landmark_screen_position
-                    drawn.append(drawn_index)
+            positions = [None for i in range(len(landmark_group))]
 
+            for landmark in landmark_group:
+                index_ = self.landmark_indices.index(landmark.idx)
+                drawn_index = index_ + group_id*len(landmark_group)
+                landmark_screen_position = [int(pos*dim) 
+                                            for pos, dim 
+                                            in zip(landmark.screen, self.image_info)]
+                self.__draw_landmark(landmark_screen_position)
+                self.__draw_landmark_attribute(landmark, landmark_screen_position, attributes, index_)
+                positions[index_] = landmark_screen_position
+                drawn.append(drawn_index)
+
+            try:
                 for endpoint1, endpoint2 in self.landmark_connections:
-                    getattr(self.renderer, f'render_{connector}')(positions[endpoint1], positions[endpoint2])
+                    getattr(self.renderer, f'render_{connector}')(positions[self.landmark_indices.index(endpoint1)],
+                                                                  positions[self.landmark_indices.index(endpoint2)])
 
-        except ValueError as e:
-            pass
-
-        except IndexError as e:
-            pass
+            except Exception as e:
+                self.renderer.render_text(e, self.renderer.image_center_left)
 
         if flipped:
             self.renderer.flip_render()
@@ -760,16 +766,18 @@ class LandmarkContainer:
         arguments = []
         for idx in indices.split(','):
             try:
-                idx = int(idx)
+                idx = self.landmark_indices.index(int(idx))
                 landmark_group = int(group_idx)
                 arguments += [getattr(self.landmark_list[landmark_group][idx],space)]
                 continue
             except ValueError:
                 pass
+            except IndexError:
+                return []
             arguments += [idx.upper()]
                 
         arguments = sanitise_arguments(instruction, arguments, space)
-        return use_function(*arguments, axis)
+        return use_function(*arguments)
             
     def measure(self,
                 *inputs:str):
