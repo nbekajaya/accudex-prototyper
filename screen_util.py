@@ -9,8 +9,8 @@ def get_screen_info():
     screen_height = root.winfo_screenheight()
     root.destroy()
 
-    with open(os.path.join(current_path,'screen_info.txt'),'w') as save_file:
-        save_file.write(f'{screen_width} {screen_height}')
+    # with open(os.path.join(current_path,'screen_info.txt'),'w') as save_file:
+    #     save_file.write(f'{screen_width} {screen_height}')
         
     return screen_width, screen_height
 
