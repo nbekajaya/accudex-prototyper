@@ -42,6 +42,10 @@ class EasyDrawer:
         self.image_bottom_center = [self.image_center[0], self.image_info[1]]
         self.image_bottom_right = [self.image_info[0], self.image_info[1]]
 
+        self.base_render_scale = min(self.image_info) * 0.0008
+        self.base_thickness_scale = int(min(self.image_info) * 0.002)
+        self.font_thickness_scale = self.base_thickness_scale//2
+
     def render_text(self, 
             string, 
             position:tuple = None, 
@@ -51,6 +55,8 @@ class EasyDrawer:
             font_face = FontFace,
             font_thickness = 1):
         renderer = self.renderer
+        scale = self.base_render_scale*scale
+        font_thickness = self.font_thickness_scale*font_thickness
         
         if position is None:
             position = self.image_center
@@ -77,9 +83,11 @@ class EasyDrawer:
     def render_circle(self,
                origin:tuple, 
                color:tuple,
-               radius = 10, 
+               radius:int = 10, 
                thickness = 1):
         renderer = self.renderer
+        radius = self.base_render_scale * radius
+        thickness = self.base_thickness_scale * thickness
 
 
         if self.renderer_index == EasyDrawer.PYGAME:
@@ -92,8 +100,9 @@ class EasyDrawer:
              p1:tuple,
              p2:tuple,
              color:tuple = FontColorWhite,
-             thickness:int = 2):
+             thickness:int = 1):
         renderer = self.renderer
+        thickness = self.base_thickness_scale * thickness
         
         if self.renderer_index==EasyDrawer.PYGAME:
             renderer.draw.line(self.image, color[::-1], p1, p2, int(thickness))
@@ -103,11 +112,13 @@ class EasyDrawer:
     def render_landmark(self,
                         position:tuple,
                         color1:tuple=FontColorWhite,
-                        radius:int=5,
-                        inner_thickness:int=1,
+                        radius:int=1,
+                        thickness:int=1,
                         scale:float=1.0,
                         color2:tuple=None):
-        renderer = self.renderer    
+        renderer = self.renderer 
+        scale = self.base_render_scale * scale 
+        thickness =  self.base_thickness_scale * thickness 
 
         if color2 is None:
             color2=color1
@@ -117,16 +128,17 @@ class EasyDrawer:
             renderer.draw.circle(self.image, color1[::-1], position, int(radius*scale*1.8), int(2*scale))
             
         if self.renderer_index == EasyDrawer.CV:
-            renderer.circle(self.image, position, int(radius*scale), color2, -1)
-            renderer.circle(self.image, position, int(radius*scale*2.5), color1, 2)
+            renderer.circle(self.image, position, int(radius*scale*0.75), color2, -1)
+            renderer.circle(self.image, position, int(radius*scale*2.5), color1, thickness)
 
     def render_bone(self, 
              p1:tuple, 
              p2:tuple, 
              color:tuple=FontColorWhite, 
-             thickness:int=2,
+             thickness:int=1,
              kite_ratio:float=0.35,
              kite_length_ratio:float=0.15):
+
         vec_dir = Toolbox.make_vector(p1,p2)
         kite_point = [p_el + vec_el * kite_ratio for p_el, vec_el in zip(p1,vec_dir)]
         tangent1 = [-vec_dir[1], vec_dir[0]]
