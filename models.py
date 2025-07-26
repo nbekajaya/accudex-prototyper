@@ -801,9 +801,11 @@ class LandmarkContainer:
             
         measured = []
 
-        if len(self.landmark_list):
+        for group in self.landmark_list:
+            tmp = []
             for in_ in inputs:
-                measured += [self.__parse_measure(in_)]
+                tmp += [self.__parse_measure(in_)]
+            measured += [tmp]
 
         self.measured:list = measured
                 
