@@ -127,6 +127,10 @@ class Toolbox:
                                     for p in (p1,p2)])) 
                     for idx in [2,0,1,3]]
         return [float(f'{magnitude:0.2f}') for magnitude in magnitudes]
+    
+    def absolute_displacement(p1,p2):
+        displacement = Toolbox.displacement(p1,p2)
+        return [abs(element) for element in displacement]
 
     def compare(val1:tuple|list, val2:tuple|list) -> list:
         '''
