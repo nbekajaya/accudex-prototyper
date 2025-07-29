@@ -1,10 +1,10 @@
 from cv2 import FONT_HERSHEY_DUPLEX
 
 FontFace = FONT_HERSHEY_DUPLEX
-FontColorRed = (90,60,220)
-FontColorBlue = (220,60,80)
-FontColorOrange = (100,190,245)
+FontColorRed = (220,60,90)
+FontColorBlue = (80,60,220)
+FontColorOrange = (245,190,100)
 FontColorWhite = (255,255,255)
 FontColorBlack = (0,0,0)
-FontColorCyan = (200,205,50)
-FontColorYellow = (80,230,225)
+FontColorCyan = (50,205,200)
+FontColorYellow = (225,230,80)
