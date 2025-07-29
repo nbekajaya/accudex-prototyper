@@ -361,12 +361,10 @@ class LandmarkContainer:
 
     def calibrate(self):
         '''
-        [NOT IMPLEMENTED]
         Calibrates the length of connections
         '''
-        raise NotImplementedError('Calibration is not implemenetd')
-        self.local_vectors = None
-        self.calibrated_length = None
+        
+        self.calibrated_groups = deepcopy(self.landmark_list)
 
     def relative_displace(self, index:int, space:str='world') -> None:
         '''
@@ -466,9 +464,6 @@ class LandmarkContainer:
             for index_idx, index_ in enumerate(self.landmark_indices[:-1]):
                 if index_>=insert_index:
                     self.landmark_indices[index_idx] += 1
-
-            
-
 
             for connection in self.landmark_connections:
                 for endpoint_idx, endpoint in enumerate(connection):
@@ -584,26 +579,26 @@ class LandmarkContainer:
         
         if 'index' in landmark_attributes:
             for_printing += [(f'{landmark.idx}', relative_positions[0],
-                              (35*scale,0), 0.8, FontColorBlack, 1)]
+                              (35*scale,0), 0.5, FontColorBlack, 1)]
             
         if 'name' in landmark_attributes:
             for_printing += [(f'{landmark.side} {landmark.name}', relative_positions[0],
-                              (35*scale,0), 0.8, FontColorBlack, 1)]
+                              (35*scale,0), 0.5, FontColorBlack, 1)]
                          
         if 'screen_coor' in landmark_attributes:
             for coor in landmark.screen:
                 for_printing += [(f'{coor:0.2f}', relative_positions[1],
-                              (0,20*scale), 0.8, FontColorOrange, 1)]
+                              (0,20*scale), 0.5, FontColorOrange, 1)]
                 
         if 'world_coor' in landmark_attributes:
             for coor in landmark.world:
                 for_printing += [(f'{coor:0.2f}', relative_positions[2],
-                              (0,20*scale), 0.8, FontColorCyan, 1)]
+                              (0,20*scale), 0.5, FontColorCyan, 1)]
         try:
             if 'local_coor' in landmark_attributes:
                 for coor in landmark.local_coor:
                     for_printing += [(f'{coor:0.2f}', relative_positions[3],
-                                (0,20*scale), 0.8, FontColorWhite, 1)]
+                                (0,20*scale), 0.5, FontColorWhite, 1)]
         except AttributeError:
             pass
 
@@ -686,7 +681,10 @@ class LandmarkContainer:
             positions = [None for i in range(len(landmark_group))]
 
             for landmark in landmark_group:
-                index_ = self.landmark_indices.index(landmark.idx)
+                try:
+                    index_ = self.landmark_indices.index(landmark.idx)
+                except ValueError:
+                    continue
                 drawn_index = index_ + group_id*len(landmark_group)
                 landmark_screen_position = [int(pos*dim) 
                                             for pos, dim 
@@ -755,29 +753,35 @@ class LandmarkContainer:
     def __parse_measure(self, instruction):
         axis_dict = dict(('x0','y1','z2','w3'))
         sanitise_arguments = self.__sanitise_arguments
-        function, space, axis, group_idx, indices, additional = instruction.split(' ',5)
+        function_name, space, use_set, indices, additional = instruction.split(' ',4)
 
         #Find measure instruction
         try:
-            use_function = getattr(toolbox, function)
+            use_function = getattr(toolbox, function_name)
         except AttributeError:
-            raise AttributeError(f'{function} is not a measure method')
+            raise AttributeError(f'{function_name} is not a measure method')
 
         arguments = []
-        for idx in indices.split(','):
-            try:
-                idx = self.landmark_indices.index(int(idx))
-                landmark_group = int(group_idx)
-                arguments += [getattr(self.landmark_list[landmark_group][idx],space)]
-                continue
-            except ValueError:
-                pass
-            except IndexError:
-                return []
-            arguments += [idx.upper()]
+        results = []
+
+        try:
+            use_set = self.calibrated_groups if use_set == 'calibrated' else self.landmark_list
+        except AttributeError:
+            use_set = self.landmark_list
+
+        for group in use_set:
+            for idx in indices.split(','):
+                try:
+                    idx = self.landmark_indices.index(int(idx))
+                    arguments += [getattr(group[idx],space)]
+                except ValueError:
+                    arguments += [idx.upper()]
+                except IndexError:
+                    return []
+            arguments = sanitise_arguments(function_name, arguments, space)
+            results += [[function_name, indices, space, use_function(*arguments)]]
                 
-        arguments = sanitise_arguments(instruction, arguments, space)
-        return use_function(*arguments)
+        return results
             
     def measure(self,
                 *inputs:str):
@@ -789,6 +793,11 @@ class LandmarkContainer:
          - angle_vector
          - displacement
          - distance
+         - bounding_box_size
+
+        Example usage:
+         "angle_point screen calibrated 0,1,vu" -> finds the angle between point 0,1 and vertical up in calibrated set
+         "distance world - 10,11" -> find the current distance between point 10,11
         
         Look at toolbox documentation for usage info
 
@@ -801,11 +810,8 @@ class LandmarkContainer:
             
         measured = []
 
-        for group in self.landmark_list:
-            tmp = []
-            for in_ in inputs:
-                tmp += [self.__parse_measure(in_)]
-            measured += [tmp]
+        for in_ in inputs:
+            measured += [self.__parse_measure(in_)]
 
         self.measured:list = measured
                 
