@@ -1,4 +1,5 @@
 from toolbox import Toolbox
+import numpy as np
 from style import *
 
 class EasyDrawer:
@@ -45,6 +46,14 @@ class EasyDrawer:
         self.base_render_scale = min(self.image_info) * 0.0008
         self.base_thickness_scale = int(min(self.image_info) * 0.002)
         self.font_thickness_scale = self.base_thickness_scale//2
+
+    def fill_image(self, color:tuple[int]):
+        """Fills image with a single colour
+
+        Args:
+            color (tuple[int]): A tuple with three integer values as RGB
+        """
+        self.image = np.full(self.image.shape, color, dtype=np.uint8)
 
     def render_text(self, 
             string, 
@@ -157,5 +166,7 @@ class EasyDrawer:
             self.image = renderer.transform.flip(self.image, 1, 0)
         if self.renderer_index == EasyDrawer.CV:
             self.image = renderer.flip(self.image, 1)
+
+    
 
 

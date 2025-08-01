@@ -54,8 +54,6 @@ while running:
     use_image = next(feed)
     current_time = int(time.time()*1000)
 
-    
-
     hand0.detect_async(use_image, current_time)
     pose0.detect_async(use_image, current_time)
 
