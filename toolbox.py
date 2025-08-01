@@ -1,15 +1,23 @@
 import numpy as np
+import cv2 as cv
 import enum
+
+class Measurement:
+    def __init__(self, **kwargs):
+        for k,v in kwargs.items:
+            setattr(self,k,v)
 
 class Toolbox:
     dot_product = lambda v1, v2: sum([e1*e2 for e1,e2 in zip(v1,v2)])
     vector_magnitude = lambda v: sum([e*e for e in v])**0.5
     normalise_vector = lambda v, magnitude: [e/magnitude for e in v]
-    normalise_vector2 = lambda v: [e/Toolbox.vector_magnitude(v) for e in v]
+    normalise_vector2 = lambda v: [Toolbox.vector_magnitude(v) and e/Toolbox.vector_magnitude(v) or 0 
+                                   for e in v] 
     clamp = lambda v,min_out,max_out: min_out if v<=min_out else max_out if v>=max_out else v
-    lerp = lambda v,min_in,max_in,min_out,max_out: ((v-min_in)/(max_in-min_in))*(max_out/min_out) + min_out
+    lerp = lambda v,min_in,max_in,min_out,max_out: ((v-min_in)/(max_in-min_in))*(max_out-min_out) + min_out
     make_vector = lambda p1, p2: [e2-e1 for e1,e2 in zip(p1,p2)]
     invert_vector = lambda v:[-el for el in v]
+    color_convert = lambda x, space:[int(x) for x in cv.cvtColor(np.array([[x]],np.uint8), space)[0][0]]
     middle_point = lambda v1,v2:[(e1+e2)//2 for e1,e2 in zip(v1,v2)]
 
     def mask_factor(v1:tuple|list, v2:tuple|list, factors):
@@ -61,7 +69,9 @@ class Toolbox:
         dot_product = Toolbox.dot_product
         nv1, nv2 = normalise_vector(v1), normalise_vector(v2)
         angles = [np.arccos(dot_product(*[
-            Toolbox.normalise_vector2([0 if idx==i else el for i,el in enumerate(vec)]) 
+            Toolbox.normalise_vector2([0 if idx==i else el 
+                                       for i,el 
+                                       in enumerate(vec)]) 
             for vec in (nv1,nv2)])) * 180/np.pi
             for idx in [0,1,2,3]]
         return [float(f'{angle:0.2f}') for angle in angles]
@@ -144,7 +154,7 @@ class Toolbox:
          A list which are ratios of elements of val1 to elements of val 2
         '''
         if len(val1) != len(val2):
-            raise Exception('Incompatible comparison between lists of unequal lengths')
+            raise ValueError('Incompatible comparison between lists of unequal lengths')
         return [float(f'{e1/e2:0.2f}') for e1,e2 in zip(val1, val2)]
 
     def rotator(point:tuple|list, rotation_value:tuple|list, origin:tuple|list = [0,0,0]) -> list:
@@ -203,11 +213,25 @@ class Toolbox:
         Returns:
          Top left and bottom right coordinates
         '''
-        a = [zip(*points)]
-        return
+        return [bounding_point for bounding_point in zip(*[(min(element), max(element)) for element in zip(*points)][:2])]
     
     def bounding_box_size(*points):
         return 
     
+    def color_lerp(value, value_min, value_max, color_min, color_max):
+        color_convert = Toolbox.color_convert
+        clamp = Toolbox.clamp
+        lerp = Toolbox.lerp
+        c1, c2 = [color_convert(color, cv.COLOR_BGR2HSV) for color in (color_min, color_max)]
+        t = clamp(lerp(value, value_min, value_max, 0, 1), 0, 1)
+        return tuple(color_convert([int(lerp(t, 0, 1, el1, el2)) for el1, el2 in zip(c1,c2)],
+                                cv.COLOR_HSV2BGR))
+    
+    def set_range(value, value_min, value_max):
+        if value_min > value_max:
+            return int(value_min > value > value_max)
+        return int(value_min < value < value_max)
+
+
 if __name__=='__main__':
     pass

@@ -82,19 +82,19 @@ class AlternateLandmarks:
     }
 
     NAT_CUSTOM = {
-        39:'29,30,31,32 0.25,0.25,0.25 mid feet',
-        40:'11,12,23,24 0.15,0.15,0.35 navel'
+        200:'29,30,31,32 0.25,0.25,0.25 mid feet',
+        201:'11,12,23,24 0.15,0.15,0.35 navel'
     }
 
     TORSO_CENTER = {
-        41:'11,12,23,24 0.25,0.25,0.25 average torso',
-        42:'11,12,23,24 0.3,0.3,0.2 weighted average'
+        300:'11,12,23,24 0.25,0.25,0.25 average torso',
+        301:'11,12,23,24 0.3,0.3,0.2 weighted average'
     }
 
     SPINE = {
-        43:'11,12,23,24 0.4,0.4,0.1 spine 1',
-        44:'11,12,23,24 0.2,0.2,0.3 spine 2',
-        45:'11,12,23,24 0.1,0.1,0.4 spine 3'
+        400:'11,12,23,24 0.4,0.4,0.1 spine 1',
+        401:'11,12,23,24 0.2,0.2,0.3 spine 2',
+        402:'11,12,23,24 0.1,0.1,0.4 spine 3'
     }
 
 
@@ -300,9 +300,26 @@ class LandmarkContainer:
                         idx=idx,
                         side=display_name
                     )
-                    for idx, (screen_mark, world_mark) in enumerate(zip(screen_mark_list, world_mark_list))
+                    for idx, (screen_mark, world_mark) 
+                    in enumerate(zip(screen_mark_list, world_mark_list))
                 ]]
+        except Exception as e:
+            # print(e)
+            pass
 
+        self.landmark_list = deepcopy(self.default_landmark_list)
+
+        try:
+            self.default_landmark_indices = [landmark.idx 
+                                             for landmark 
+                                             in self.landmark_list[0]]
+        except IndexError:
+            self.default_landmark_indices = []
+
+        self.landmark_indices = deepcopy(self.default_landmark_indices)
+        self.data_storage.append(self.landmark_list)
+
+        try:
             world_x, world_y, world_z = zip(*[landmark.world for landmark in sum(self.landmark_list,[])])
             max_world = max(world_x), max(world_y), max(world_z)
             min_world = min(world_x), min(world_y), min(world_z)
@@ -310,19 +327,8 @@ class LandmarkContainer:
             self.VD_world = (max_world[0]/2 + min_world[0]/2, min_world[1], max_world[2]/2 + min_world[2]/2)
             self.HR_world = (max_world[0], max_world[1]/2 + min_world[1]/2 , max_world[2]/2 + min_world[2]/2)
             self.HL_world = (max_world[0], max_world[1]/2 + min_world[1]/2 , max_world[2]/2 + min_world[2]/2)
-
         except Exception as e:
-            # print(e) 
             pass
-
-        self.landmark_list = deepcopy(self.default_landmark_list)
-        try:
-            self.default_landmark_indices = [landmark.idx for landmark in self.landmark_list[0]]
-        except IndexError:
-            self.default_landmark_indices = []
-
-        self.landmark_indices = deepcopy(self.default_landmark_indices)
-        self.data_storage.append(self.landmark_list)
 
         if self.timestamp_storage[0] <= timestamp_ms-self.max_data_age_ms:
             self.timestamp_storage.pop(0)
@@ -359,12 +365,12 @@ class LandmarkContainer:
         self.renderer.set_image(image, flip)
         self.image_info = self.renderer.image_info
 
-    def calibrate(self):
+    def calibrate(self, timestamp):
         '''
         Calibrates the length of connections
         '''
-        
         self.calibrated_groups = deepcopy(self.landmark_list)
+        self.calibration_time = timestamp
 
     def relative_displace(self, index:int, space:str='world') -> None:
         '''
@@ -391,9 +397,11 @@ class LandmarkContainer:
     
             for landmark in group:
                 position = getattr(landmark, space)
-                setattr(landmark, space, [element-origin 
-                                            for element, origin 
-                                            in zip(position, new_origin)])
+                setattr(landmark, 
+                        space, 
+                        [element-origin 
+                         for element, origin 
+                         in zip(position, new_origin)])
             
     def center_of_mass(self):
         for group in self.landmark_list:
@@ -423,20 +431,29 @@ class LandmarkContainer:
         factors += [1-sum(factors)]
         
         for attribute in attributes:
-            reference_landmarks = [getattr(group[index], attribute) for index in reference_indices]
-            attributes_dict[attribute] = [sum([element*factor for element, factor in zip(elements, factors)]) 
+            reference_landmarks = [getattr(group[index], attribute) 
+                                   for index 
+                                   in reference_indices]
+            attributes_dict[attribute] = [sum([element*factor 
+                                               for element, factor 
+                                               in zip(elements, factors)]) 
                                           for elements in zip(*reference_landmarks)]
             
         side = group[0].side
 
-        return CustomLandmark(**attributes_dict, name=name, side=side, idx=insert_index)
+        return CustomLandmark(**attributes_dict, 
+                              name=name, 
+                              side=side, 
+                              idx=insert_index)
 
     def reorder_landmarks(self, landmark_dict:dict):
         '''
         Inserts new landmarks at certain positions
 
-        {13:'11,12 0.5 mid shoulder'} -> adds a new landmark at index 13 which is halfway between index 11 and 12 called mid shoulder
-        {14:'11,12,28,29 0.2,0.2,0.3 navel'} -> adds a new landmark at index 14 whic is closer to 28 and 29 than 11 and 12 called navel
+        {13:'11,12 0.5 mid shoulder'} -> adds a new landmark at index 13 
+            which is halfway between index 11 and 12 called mid shoulder
+        {14:'11,12,28,29 0.2,0.2,0.3 navel'} -> adds a new landmark at index 14 
+            which is closer to 28 and 29 than 11 and 12 called navel
 
         params:
          - landmark_dict(dict): A dictionary
@@ -535,9 +552,11 @@ class LandmarkContainer:
         Params:
          - position(tuple|list): Coordinate to draw landmark at
          - radius(int): radius of landmark, defaults to 5
-         - color(tuple|list): BGR Color, defaults to style.FontColorWhite
+         - color(tuple|list): RGB Color, defaults to style.FontColorWhite
          - scale(float): scaling factor of landmark, defaults to 1.0
-         - color2(tuple|list): BGR Color, if left None will become the same as color, defaults to None
+         - color2(tuple|list): RGB Color, 
+                                if left None will become the same as color. 
+                                Defaults to None.
 
         Returns:
          None, draws landmark
@@ -545,7 +564,11 @@ class LandmarkContainer:
         '''
         position = [int(pos) for pos in position]
             
-        self.renderer.render_landmark(position, color1=color, radius=radius, scale=scale, color2=color2)
+        self.renderer.render_landmark(position, 
+                                      color1=color, 
+                                      radius=radius, 
+                                      scale=scale, 
+                                      color2=color2)
 
     def __draw_landmark_attribute(self, 
                   landmark:CustomLandmark, 
@@ -609,11 +632,83 @@ class LandmarkContainer:
         for message, pos, displacer, f_scale, color, thickness in for_printing:
             self.renderer.render_text(message, pos, displacer,
                          color, f_scale*scale)
+    
+    def __draw_measurement(self, 
+                           measurement:dict,
+                           position:tuple[int],
+                           displace:tuple[int],
+                           idx:int, 
+                           color1:tuple, 
+                           color2:tuple):
+        render_text = self.renderer.render_text
+
+        def colorise_bounds(value,params,tolerance = 0.1):
+            def one_side_bound(bound, negate:bool):
+                tolerance_ = -tolerance if negate else tolerance
+                return toolbox.color_lerp(value, 
+                                          bound+tolerance_, 
+                                          bound, 
+                                          color1,
+                                          color2)
+            if all([el not in params for el in ('lower_bound','upper_bound')]):
+                return color2
+            
+            if 'lower_bound' not in params:
+                bound = params['upper_bound']
+                return one_side_bound(bound, False)
+
+            if 'upper_bound' not in params:
+                bound = params['lower_bound']
+                return one_side_bound(bound, True)
+
+            bounds = (params['lower_bound'], params['upper_bound'])
+            if value > bounds[1]:
+                bound = bounds[1]
+                return one_side_bound(bound, False)
+            
+            bound = bounds[0]
+            return one_side_bound(bound,True)
+            
+        params = measurement['params']
+        try:
+            if params['do_draw'] == False:
+                return
+        except KeyError:
+            pass
+
+        test_value = measurement['result']
+
+        local_position = [el_p + idx*el_d
+                          for el_p, el_d
+                          in zip(position, displace)]
+
+        if isinstance(test_value,str):
+            render_text(test_value, local_position, color=color1)
+            return
+        
+        try:
+            test_value = test_value[params['check_index']]
+        except KeyError:
+            pass
+
+        try:
+            use_name = params['name'] 
+        except KeyError:
+            use_name = '-'.join([measurement['function_name']]\
+                                +params['default_names'])
+        
+        measure_color = colorise_bounds(test_value, params)
+
+        for element in [use_name, test_value]:
+            render_text(element, local_position, color=measure_color)
+        
+        idx += 1
         
     def draw(self, 
              current_timestamp: int,
-             information = None, 
-             indices = True, 
+             draw_debug:bool=False, 
+             draw_measurements:bool=True,
+             measurement_color_range:tuple[tuple]=(FontColorRed, FontColorCyan), 
              attributes = 'index name screen_coor world_coor local_coor',
              connector = 'line',
              flipped:bool=True):
@@ -643,43 +738,53 @@ class LandmarkContainer:
         """
         drawn = [] # Keeps track of rendered info
 
+        debug_draw_position = (10,60)
+        debug_displacer = (0,40)
         # DEBUGGING STUFF
-        self.renderer.render_text(f'{len(self.timestamp_storage)/(self.max_data_age_ms/1000):0.1f} fps', 
-                     position = (10,60),
-                     scale = 2,
-                     color = FontColorYellow)
-        
-        self.renderer.render_text(f'{len(self.timestamp_storage)} frames in storage',
-                     position = (10,60),
-                     displacer = (0,40),
-                     color = FontColorYellow)
-        
-        self.renderer.render_text(f'real time {current_timestamp} ms',
-                     position = (10,60),
-                     displacer = (0,40),
-                     color = FontColorYellow)
-        
-        try:
-            self.renderer.render_text(f'latest processed {self.timestamp_storage[-1]} ms',
-                        position = (10,60),
-                        displacer = (0,40),
+        if draw_debug:
+            self.renderer.render_text(f'{len(self.timestamp_storage)/(self.max_data_age_ms/1000):0.1f} fps', 
+                        position = debug_draw_position,
+                        scale = 2,
                         color = FontColorYellow)
-        except IndexError:
-            pass
+            
+            self.renderer.render_text(f'{len(self.timestamp_storage)} frames in storage',
+                        position = debug_draw_position,
+                        displacer = debug_displacer,
+                        color = FontColorYellow)
+            
+            self.renderer.render_text(f'real time {current_timestamp} ms',
+                        position = debug_draw_position,
+                        displacer = debug_displacer,
+                        color = FontColorYellow)
+        
+            try:
+                self.renderer.render_text(f'latest processed {self.timestamp_storage[-1]} ms',
+                            position = debug_draw_position,
+                            displacer = debug_displacer,
+                            color = FontColorYellow)
+            except IndexError:
+                pass
 
-        try:
-            for basis in self.hand_basis:
-                self.renderer.render_text(f'[{','.join([f'{el:0.2f}' for el in basis])}] basis',
-                             position = (10,60),
-                             displacer = (0,40),
-                             color = FontColorYellow)
-        except:
-            pass
+        if hasattr(self, 'calibration_time'):
+            if (current_timestamp - 2500) < self.calibration_time:
+                self.renderer.render_text(f'Calibrated at {self.calibration_time} ms',
+                                          debug_draw_position,
+                                          color = FontColorYellow,
+                                          font_thickness=2)
+
+        # Drawing measurement stuff
+        if draw_measurements and hasattr(self,'measured'):
+            for measurement_group in self.measured:
+                drawn_measurement = 0
+                for measurement in measurement_group:
+                    self.__draw_measurement(measurement,
+                                            debug_draw_position,
+                                            (0,60),
+                                            drawn_measurement,
+                                            *measurement_color_range)
         
         for group_id, landmark_group in enumerate(self.landmark_list):
-
             positions = [None for i in range(len(landmark_group))]
-
             for landmark in landmark_group:
                 try:
                     index_ = self.landmark_indices.index(landmark.idx)
@@ -698,9 +803,9 @@ class LandmarkContainer:
                 for endpoint1, endpoint2 in self.landmark_connections:
                     getattr(self.renderer, f'render_{connector}')(positions[self.landmark_indices.index(endpoint1)],
                                                                   positions[self.landmark_indices.index(endpoint2)])
-
             except Exception as e:
-                self.renderer.render_text(e, self.renderer.image_center_left)
+                # self.renderer.render_text(e, self.renderer.image_center_left)
+                pass
 
         if flipped:
             self.renderer.flip_render()
@@ -708,7 +813,10 @@ class LandmarkContainer:
         return self.renderer.image
         
 
-    def __sanitise_arguments(self, instruction:str, arguments:tuple|list, space:str):
+    def __sanitise_arguments(self, 
+                             instruction:str, 
+                             arguments:tuple|list, 
+                             space:str):
         def determine_factor(primitive:str):
             if 'V' in primitive:
                 return (0,1,0)
@@ -725,6 +833,10 @@ class LandmarkContainer:
                     for arg
                     in arguments]
         
+        arguments = [getattr(argument,space) if hasattr(argument,space) else argument
+                     for argument
+                     in arguments]
+
         if all([isinstance(arg, tuple) for arg in arguments]): # No primitive vector
             return arguments
         
@@ -750,38 +862,74 @@ class LandmarkContainer:
                 for arg
                 in arguments]
     
-    def __parse_measure(self, instruction):
-        axis_dict = dict(('x0','y1','z2','w3'))
+    def __parse_measure(self, group_idx:int, instruction:dict):
         sanitise_arguments = self.__sanitise_arguments
-        function_name, space, use_set, indices, additional = instruction.split(' ',4)
 
-        #Find measure instruction
+        def get_landmark_from_index(use_calibrated:bool, indices):
+            lookup = self.landmark_indices
+            use_set = self.landmark_list
+            if use_calibrated:
+                use_set = self.calibrated_groups
+            
+            landmarks = []
+
+            for idx in indices:
+                if isinstance(idx, int):
+                    try:
+                        landmarks += [use_set\
+                                      [group_idx]\
+                                      [lookup.index(idx)]]
+                        continue
+                    except ValueError:
+                        pass
+                if isinstance(idx, str):
+                    landmarks += [idx]
+                    continue
+                landmarks += [None]
+
+            return landmarks
+
+        function_name = instruction['function_name']
+        indices = instruction['indices']
+
+        # Find measure function
         try:
             use_function = getattr(toolbox, function_name)
         except AttributeError:
             raise AttributeError(f'{function_name} is not a measure method')
 
-        arguments = []
-        results = []
+        if instruction['function_name'] == 'compare':
+            try:
+                measured_values = [self.measured[group_idx][idx]['result'] 
+                                   for idx 
+                                   in indices]
+                instruction['params']['default_names'] = [str(idx) 
+                                                          for idx 
+                                                          in indices]
+                instruction['result'] = use_function(*measured_values)
+            except IndexError as e:
+                instruction['result'] = f"{self.measured[group_idx]}"
+            except ValueError:
+                instruction['result'] = "INCOMPATIBLE LISTS"
+            return instruction
+        
+        use_calibrated = instruction['use_calibrated']
 
-        try:
-            use_set = self.calibrated_groups if use_set == 'calibrated' else self.landmark_list
-        except AttributeError:
-            use_set = self.landmark_list
+        if (not hasattr(self, 'calibrated_groups')) and use_calibrated:
+            instruction['result'] = "NOT YET CALIBRATED"
+            return instruction
+        
+        space = instruction['space']
 
-        for group in use_set:
-            for idx in indices.split(','):
-                try:
-                    idx = self.landmark_indices.index(int(idx))
-                    arguments += [getattr(group[idx],space)]
-                except ValueError:
-                    arguments += [idx.upper()]
-                except IndexError:
-                    return []
-            arguments = sanitise_arguments(function_name, arguments, space)
-            results += [[function_name, indices, space, use_function(*arguments)]]
-                
-        return results
+        landmarks = get_landmark_from_index(use_calibrated, indices)
+        instruction['params']['default_names'] = [landmark.name if hasattr(landmark,'name') else landmark 
+                                                  for landmark in landmarks]
+        arguments = sanitise_arguments(function_name, 
+                                       get_landmark_from_index(use_calibrated, indices), 
+                                       space)
+        result = use_function(*arguments)
+
+        return instruction|{'result':result}
             
     def measure(self,
                 *inputs:str):
@@ -796,7 +944,8 @@ class LandmarkContainer:
          - bounding_box_size
 
         Example usage:
-         "angle_point screen calibrated 0,1,vu" -> finds the angle between point 0,1 and vertical up in calibrated set
+         "angle_point screen calibrated 0,1,vu" -> finds the angle between point 0,1 and 
+            vertical up in calibrated set
          "distance world - 10,11" -> find the current distance between point 10,11
         
         Look at toolbox documentation for usage info
@@ -806,14 +955,19 @@ class LandmarkContainer:
 
         Returns:
          None, measured properties are accesible from 'measured' attribute a list
-        '''
-            
-        measured = []
+        ''' 
+        self.measured = []
 
-        for in_ in inputs:
-            measured += [self.__parse_measure(in_)]
+        try:
+            assert len(sum(self.landmark_list,[]))>0
+        except:
+            return
 
-        self.measured:list = measured
+        for group_idx in range(len(self.landmark_list)):
+            self.measured += [[]]
+            for in_ in inputs:
+                self.measured[group_idx] += [self.__parse_measure(group_idx, in_)]
+
                 
 if __name__=='__main__':
     pass
