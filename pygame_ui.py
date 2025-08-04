@@ -31,7 +31,8 @@ pose = LandmarkContainer(ModelIndices.POSE_MODEL,
 hand = LandmarkContainer(ModelIndices.HAND_MODEL, 
                          options={'num_hands':2}, 
                          renderer = EasyDrawer.CV)
-do_calibrate = False
+do_calibrate = do_multi_calibrate = do_record = False
+recording = []
 
 start_time = int(time.time()*1000)
 
@@ -49,7 +50,12 @@ while running:
             
             if event.key == pygame.K_v:
                 do_calibrate = True
-                calibrate_time = current_time + 2500
+            
+            if event.key == pygame.K_b:
+                do_multi_calibrate = True
+
+            if event.key == pygame.K_r:
+                do_record = not(do_record)
         
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 3:
@@ -88,6 +94,11 @@ while running:
         
     if do_calibrate:
         pose.calibrate(current_time)
+    
+    if do_multi_calibrate:
+        pose.multi_calibrate(current_time)
+
+    
 
     # Nose Plotting stuff
     # fig, ax = plt.subplots()
@@ -116,6 +127,10 @@ while running:
     #     raise RuntimeError
     # except IndexError:
     #     pass
+    
+    if do_record:
+        pose.renderer.render_text("RECORDING", (10, 30), color=style.FontColorRed, scale=1.2, font_thickness=2)
+        recording.append([pose.current_processed_timestamp, pose.landmark_list, pose.measured])
 
     use_image = pose.draw(real_time, 
                           draw_measurements=True, 
@@ -125,6 +140,10 @@ while running:
     use_image = hand.draw(real_time, 
                           connector='bone', 
                           flipped=True)
+    
+    
+
+    
 
     use_image = convert_cv_to_pygame(use_image)
     current_window_size = pygame.display.get_window_size()
@@ -141,13 +160,13 @@ while running:
     pygame.display.flip()
 
     clock.tick(60)  # limits FPS to 60
-    do_calibrate = False
+    do_calibrate = do_multi_calibrate = False
 
 camera.stop_stream()
 pose.close()
 hand.close()
 
-# with open(f'Storage.txt','w') as text:
-#     for timestamp, data in zip(hand0.timestamp_storage, hand0.data_storage):
-#         text.write(f'[{timestamp},{data}]\n')
+with open(f'Storage.txt','w') as text:
+    for info in recording:
+        text.write(f'[{info}]\n')
 pygame.quit()

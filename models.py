@@ -274,6 +274,7 @@ class LandmarkContainer:
         Internal function for the detection callback function
         '''   
         # self.data_storage.append(result)
+        self.current_processed_timestamp = timestamp_ms
         self.timestamp_storage.append(timestamp_ms)
 
         pose_attributes = list(zip(*[getattr(result, attribute_) 
@@ -370,6 +371,13 @@ class LandmarkContainer:
         Calibrates the length of connections
         '''
         self.calibrated_groups = deepcopy(self.landmark_list)
+        self.calibration_time = timestamp
+
+    def multi_calibrate(self, timestamp, max_calibrations=4):
+        if not hasattr(self, 'multi_calibrated_groups') or len(self.multi_calibrated_groups)==max_calibrations:
+            self.multi_calibrated_groups = []
+        
+        self.multi_calibrated_groups += [deepcopy(self.landmark_list)]
         self.calibration_time = timestamp
 
     def relative_displace(self, index:int, space:str='world') -> None:
@@ -865,19 +873,14 @@ class LandmarkContainer:
     def __parse_measure(self, group_idx:int, instruction:dict):
         sanitise_arguments = self.__sanitise_arguments
 
-        def get_landmark_from_index(use_calibrated:bool, indices):
+        def get_landmark_from_index(landmark_group, indices):
             lookup = self.landmark_indices
-            use_set = self.landmark_list
-            if use_calibrated:
-                use_set = self.calibrated_groups
-            
             landmarks = []
 
             for idx in indices:
                 if isinstance(idx, int):
                     try:
-                        landmarks += [use_set\
-                                      [group_idx]\
+                        landmarks += [landmark_group\
                                       [lookup.index(idx)]]
                         continue
                     except ValueError:
@@ -913,19 +916,38 @@ class LandmarkContainer:
                 instruction['result'] = "INCOMPATIBLE LISTS"
             return instruction
         
+        if 'use_calibrated' not in instruction:
+            instruction['use_calibrated'] = False
+        
+        if 'use_multi_calibrated' not in instruction:
+            instruction['use_multi_calibrated'] = False
+        
         use_calibrated = instruction['use_calibrated']
+        use_multi_calibrated = instruction['use_multi_calibrated']
+        use_landmark_group = self.landmark_list[group_idx]
 
-        if (not hasattr(self, 'calibrated_groups')) and use_calibrated:
-            instruction['result'] = "NOT YET CALIBRATED"
-            return instruction
+        if use_calibrated:
+            if not hasattr(self, 'calibrated_groups'):
+                instruction['result'] = "NOT YET CALIBRATED"
+                return instruction
+            use_landmark_group = self.calibrated_groups[group_idx]
+        
+        if not (use_multi_calibrated is False):
+            if not hasattr(self,'multi_calibrated_groups'):
+                instruction['result'] = "NOT YET MULTI CALIBRATED"
+                return instruction
+            if (len(self.multi_calibrated_groups)-1) < use_multi_calibrated:
+                instruction['result'] = "MULTI CALIBRATION INDEX DOES NOT EXIST"
+                return instruction
+            use_landmark_group = self.multi_calibrated_groups[use_multi_calibrated][group_idx]
         
         space = instruction['space']
 
-        landmarks = get_landmark_from_index(use_calibrated, indices)
+        landmarks = get_landmark_from_index(use_landmark_group, indices)
         instruction['params']['default_names'] = [landmark.name if hasattr(landmark,'name') else landmark 
                                                   for landmark in landmarks]
         arguments = sanitise_arguments(function_name, 
-                                       get_landmark_from_index(use_calibrated, indices), 
+                                       landmarks, 
                                        space)
         result = use_function(*arguments)
 
