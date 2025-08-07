@@ -227,6 +227,12 @@ class Toolbox:
         return tuple(color_convert([int(lerp(t, 0, 1, el1, el2)) for el1, el2 in zip(c1,c2)],
                                 cv.COLOR_HSV2BGR))
     
+    def coordinate_weighter(coordinates, weights):
+        return [sum(positions) 
+                for positions 
+                in zip(*[[el*weight for el in coordinate] 
+                         for coordinate, weight in zip(coordinates,weights)])]
+    
     def set_range(value, value_min, value_max):
         if value_min > value_max:
             return int(value_min > value > value_max)

@@ -61,41 +61,49 @@ class CustomLandmark:
                 self.world[2]=-self.world[2]
 
     def __repr__(self):
-        return f'{self.side}-{self.idx}-{self.name}|screen: {self.screen}|world: {self.world}'
+        return f'{self.side}-{self.idx}-{self.name}| screen: {self.screen}| world: {self.world}\n'
     
 class ModelIndices:
     HAND_MODEL = 0
     POSE_MODEL = 1
 
 class AlternateLandmarks:
-    DRESIO = {
-        13:'11,12 0.5 mid shoulder',
-        16:'11,13 0.5 left upper arm',
-        17:'12,14 0.5 right upper arm',
-        20:'13,15 0.5 left forearm',
-        21:'14,16 0.5 right forearm',
-        30:'23,24 0.5 mid hip',
-        33:'23,25 0.5 left thigh',
-        34:'24,26 0.5 right thigh',
-        37:'25,27 0.5 left calf',
-        38:'26,28 0.5 right calf',
-    }
+    DRESIO = [
+        '-1 ORIGINAL',
+        '13 11,12 0.5 mid shoulder',
+        '16 11,13 0.5 left upper arm',
+        '17 12,14 0.5 right upper arm',
+        '20 13,15 0.5 left forearm',
+        '21 14,16 0.5 right forearm',
+        '30 23,24 0.5 mid hip',
+        '33 23,25 0.5 left thigh',
+        '34 24,26 0.5 right thigh',
+        '37 25,27 0.5 left calf',
+        '38 26,28 0.5 right calf',
+    ]
 
-    NAT_CUSTOM = {
-        200:'29,30,31,32 0.25,0.25,0.25 mid feet',
-        201:'11,12,23,24 0.15,0.15,0.35 navel'
-    }
+    NAT_CUSTOM = [
+        '-1 ORIGINAL',
+        '200 29,30,31,32 0.25 mid feet',
+        '201 11,12,23,24 0.15,0.15,0.35,0.35 navel'
+    ]
 
-    TORSO_CENTER = {
-        300:'11,12,23,24 0.25,0.25,0.25 average torso',
-        301:'11,12,23,24 0.3,0.3,0.2 weighted average'
-    }
+    TORSO_CENTER = [
+        '-1 LIVE',
+        '300 13,30 0.5 average torso'
+    ]
 
-    SPINE = {
-        400:'11,12,23,24 0.4,0.4,0.1 spine 1',
-        401:'11,12,23,24 0.2,0.2,0.3 spine 2',
-        402:'11,12,23,24 0.1,0.1,0.4 spine 3'
-    }
+    SPINE = [
+        '-1 LIVE',
+        '400 13,30 0.8,0.2 spine 1',
+        '401 13,30 0.4,0.6 spine 2',
+        '402 13,30 0.2,0.8 spine 3',
+    ]
+
+    CENTER_OF_MASS = [
+        '-1 LIVE',
+        '5000 0,300,24,25,20,21,16,17,35,36,37,38,33,34 0.08,0.5,0.007,0.007,0.016,0.016,0.027,0.027,0.015,0.015,0.045,0.045,0.1,0.1 center of mass'
+    ]
 
 
 class LandmarkConnections:
@@ -147,23 +155,6 @@ class LandmarkNames:
         'left foot index', 'right foot index'
     ]
 
-class OtherLandmarkAttributes:
-    BODY_WEIGHT_RATIOS = [
-        0.08,
-        0.5,
-        0.007,
-        0.007,
-        0.016,
-        0.016,
-        0.027,
-        0.027,
-        0.015,
-        0.015,
-        0.045,
-        0.045,
-        0.1,
-        0.1
-    ]
 
 class LandmarkContainer:
     model_params = (
@@ -305,7 +296,6 @@ class LandmarkContainer:
                     in enumerate(zip(screen_mark_list, world_mark_list))
                 ]]
         except Exception as e:
-            # print(e)
             pass
 
         self.landmark_list = deepcopy(self.default_landmark_list)
@@ -400,7 +390,6 @@ class LandmarkContainer:
         
         landmark_indices = self.landmark_indices
         for group in self.landmark_list:
-            
             new_origin = getattr(group[landmark_indices.index(index)], space)
     
             for landmark in group:
@@ -416,55 +405,57 @@ class LandmarkContainer:
             self.com = sum([])
 
     def __new_landmark_parse(self, 
-                             instruction:str, 
-                             group_idx:int,
+                             instruction:str,
+                             index_lookup:list,
+                             reference_group:list[CustomLandmark],
                              insert_index:int) -> CustomLandmark:
         '''
         Parses landmark stuff
         '''
         attributes = ['screen','world']
         attributes_dict = {}
-        group = self.default_landmark_list[group_idx]
 
         reference_indices, factors, name = instruction.split(' ', maxsplit=2)
-        reference_indices = [int(index_) for index_ in reference_indices.split(',')]
+        reference_indices = [index_lookup.index(int(index_)) 
+                             for index_ 
+                             in reference_indices.split(',')]
+
         factors = [float(factor) for factor in factors.split(',')]
+
+        if len(factors) == 1: # If only one factor, apply to all
+            factors = [factors[0] for i in range(len(reference_indices))]
         
-        if len(factors) != len(reference_indices)-1:
+        if len(factors) != len(reference_indices):
             raise Exception("Number of factors unmatchable to indices")
         
-        if sum(factors) >= 1:
-            raise Exception("Factors don't add up to 1")
-        
-        factors += [1-sum(factors)]
+        if sum(factors) > 1:
+            raise Exception("Factor sum is over 1")
         
         for attribute in attributes:
-            reference_landmarks = [getattr(group[index], attribute) 
+            reference_landmarks = [getattr(reference_group[index], attribute) 
                                    for index 
                                    in reference_indices]
-            attributes_dict[attribute] = [sum([element*factor 
-                                               for element, factor 
-                                               in zip(elements, factors)]) 
-                                          for elements in zip(*reference_landmarks)]
+            attributes_dict[attribute] = toolbox.coordinate_weighter(reference_landmarks, 
+                                                                     factors)
             
-        side = group[0].side
+        side = reference_group[0].side
 
         return CustomLandmark(**attributes_dict, 
                               name=name, 
                               side=side, 
                               idx=insert_index)
 
-    def reorder_landmarks(self, landmark_dict:dict):
+    def reorder_landmarks(self, landmark_additions:list[str]):
         '''
         Inserts new landmarks at certain positions
 
-        {13:'11,12 0.5 mid shoulder'} -> adds a new landmark at index 13 
+        ['13 11,12 0.5 mid shoulder'] -> adds a new landmark at index 13 
             which is halfway between index 11 and 12 called mid shoulder
-        {14:'11,12,28,29 0.2,0.2,0.3 navel'} -> adds a new landmark at index 14 
+        ['14 11,12,28,29 0.2,0.2,0.3 navel'] -> adds a new landmark at index 14 
             which is closer to 28 and 29 than 11 and 12 called navel
 
         params:
-         - landmark_dict(dict): A dictionary
+         - landmark_dict(list[str]): A dictionary
 
         returns:
          updates the landmark_list
@@ -476,10 +467,29 @@ class LandmarkContainer:
         except AttributeError:
             return
         
-        for insert_index, instruction in landmark_dict.items():
+        reference_group = self.default_landmark_list
+        index_lookup = self.default_landmark_indices
+
+        for element in landmark_additions:
+            element:str
+
+            insert_index, instruction = element.split(maxsplit=1)
+            insert_index = int(insert_index)
+
+            if insert_index == -1:
+                if instruction == "ORIGINAL":
+                    reference_group = self.default_landmark_list
+                    index_lookup = self.default_landmark_indices
+                    continue
+                reference_group = self.landmark_list
+                index_lookup = self.landmark_indices
+                continue
+
             for group_idx, group in enumerate(self.landmark_list):
-                group.append( 
-                             self.__new_landmark_parse(instruction, group_idx, insert_index))
+                group.append(self.__new_landmark_parse(instruction, 
+                                                       index_lookup,
+                                                       reference_group[group_idx],
+                                                       insert_index))
                 
                 for landmark in group[:-1]:
                     if landmark.idx>=insert_index:

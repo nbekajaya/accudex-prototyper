@@ -28,18 +28,17 @@ feed = camera.stream()
 pose = LandmarkContainer(ModelIndices.POSE_MODEL, 
                          options={'num_poses':1}, 
                          renderer = EasyDrawer.CV)
+
 hand = LandmarkContainer(ModelIndices.HAND_MODEL, 
                          options={'num_hands':2}, 
                          renderer = EasyDrawer.CV)
+
 do_calibrate = do_multi_calibrate = do_record = False
 recording = []
 
 start_time = int(time.time()*1000)
 
 while running:
-    current_time = int(1000*time.time()) - start_time
-    # poll for events
-    # pygame.QUIT event means the user clicked X to close your window
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -61,28 +60,24 @@ while running:
             if event.button == 3:
                 pass
 
-    use_image = next(feed)
+    current_time = int(1000*time.time()) - start_time
 
+    
+
+    # DO THE PROCESSING
+    use_image = next(feed)
     pose.detect_async(use_image, current_time)
     hand.detect_async(use_image, current_time)
 
+    # REORDERING LANDMARKS
     pose.reorder_landmarks(AlternateLandmarks.DRESIO
-                           |AlternateLandmarks.NAT_CUSTOM
-                           |AlternateLandmarks.TORSO_CENTER
-                           |AlternateLandmarks.SPINE
-                           |{1010:'11,23 0.5 mid left',
-                             1011:'12,24 0.5 mid right'})
+                           +AlternateLandmarks.NAT_CUSTOM
+                           +AlternateLandmarks.TORSO_CENTER
+                           +AlternateLandmarks.SPINE
+                           +AlternateLandmarks.CENTER_OF_MASS)
 
     pose.flip_axes('x')
     hand.flip_axes('x')
-
-    # try:
-    #     print(len(pose.landmark_list[0]))
-    # except IndexError:
-    #     pass
-
-    # pose.localise_vectors(('index',28,29),('index',30,13))
-    # pose.relative_displace(39)
 
     try:
         pose.landmark_connections += [[30,400], 
@@ -90,6 +85,7 @@ while running:
                                       [401,402], 
                                       [402,13]]
     except IndexError: pass
+
     pose.measure(*mprot.DEMMI_STAND)
         
     if do_calibrate:
@@ -98,40 +94,22 @@ while running:
     if do_multi_calibrate:
         pose.multi_calibrate(current_time)
 
-    
-
-    # Nose Plotting stuff
-    # fig, ax = plt.subplots()
-    # ax.set_ylim(0,1)
-    # nose_positions = []
-    # for stored in pose.data_storage:
-    #     # pass
-    #     for group in stored:
-    #         nose_positions += [group[0].screen[1]]
-    #         # pass
-    # ax.plot(nose_positions)
-    # canvas = FigureCanvasAgg(fig)
-    # canvas.draw()
-    # image_plot = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
-    # plt.close()
-    # image_plot = image_plot.reshape(fig.canvas.get_width_height()[::-1]+(4,))[:,:,:3]
-    # use_image[:960,:1280,:]=image_plot
     real_time = int(1000*time.time()) - start_time
 
     pose.set_display(use_image, flip=True)    
     pose.renderer.fill_image((50,40,130))
     
-    # try:
-    #     pose.landmark_list[0]
-    #     print(pose.landmark_list)
-    #     raise RuntimeError
-    # except IndexError:
-    #     pass
-    
     if do_record:
-        pose.renderer.render_text("RECORDING", (10, 30), color=style.FontColorRed, scale=1.2, font_thickness=2)
-        recording.append([pose.current_processed_timestamp, pose.landmark_list, pose.measured])
+        pose.renderer.render_text("RECORDING", 
+                                  (10, 30), 
+                                  color=style.FontColorRed, 
+                                  scale=1.2, 
+                                  font_thickness=2)
+        recording.append([pose.current_processed_timestamp, 
+                          pose.landmark_list, 
+                          pose.measured])
 
+    # FINAL DRAWING
     use_image = pose.draw(real_time, 
                           draw_measurements=True, 
                           flipped=True)
@@ -141,16 +119,11 @@ while running:
                           connector='bone', 
                           flipped=True)
     
-    
-
-    
-
     use_image = convert_cv_to_pygame(use_image)
     current_window_size = pygame.display.get_window_size()
     use_image = pygame.transform.scale(use_image, current_window_size)
     use_image = pygame.transform.flip(use_image, 1, 0)
 
-    # fill the screen with a color to wipe away anything from last frame
     screen.blit(use_image, (0,0))
     
     # RENDER YOUR GAME HERE
@@ -169,4 +142,5 @@ hand.close()
 with open(f'Storage.txt','w') as text:
     for info in recording:
         text.write(f'[{info}]\n')
+        
 pygame.quit()
