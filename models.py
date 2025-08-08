@@ -694,7 +694,7 @@ class LandmarkContainer:
         except KeyError:
             pass
 
-        test_value = measurement['result']
+        test_value = [float(f'{el:0.2f}') for el in measurement['result']]
 
         local_position = [el_p + idx*el_d
                           for el_p, el_d
@@ -964,7 +964,7 @@ class LandmarkContainer:
         return instruction|{'result':result}
             
     def measure(self,
-                *inputs:str):
+                *inputs:dict):
         '''
         Measures properties using toolboxes
 
@@ -976,9 +976,7 @@ class LandmarkContainer:
          - bounding_box_size
 
         Example usage:
-         "angle_point screen calibrated 0,1,vu" -> finds the angle between point 0,1 and 
-            vertical up in calibrated set
-         "distance world - 10,11" -> find the current distance between point 10,11
+         Look at measurement_protocols script
         
         Look at toolbox documentation for usage info
 

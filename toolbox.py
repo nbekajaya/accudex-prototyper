@@ -69,12 +69,12 @@ class Toolbox:
         dot_product = Toolbox.dot_product
         nv1, nv2 = normalise_vector(v1), normalise_vector(v2)
         angles = [np.arccos(dot_product(*[
-            Toolbox.normalise_vector2([0 if idx==i else el 
+            normalise_vector([0 if idx==i else el 
                                        for i,el 
                                        in enumerate(vec)]) 
             for vec in (nv1,nv2)])) * 180/np.pi
             for idx in [0,1,2,3]]
-        return [float(f'{angle:0.2f}') for angle in angles]
+        return angles
         
     def angle_point(p1, p2, p3) -> list:
         '''
@@ -109,7 +109,7 @@ class Toolbox:
         '''
         make_vector = Toolbox.make_vector
         vector = make_vector(p1,p2)
-        return [float(f'{element:0.2f}') for element in vector]
+        return vector
 
     def distance(p1:tuple|list, p2:tuple|list) -> list:
         '''
@@ -136,7 +136,7 @@ class Toolbox:
                                        for i,el in enumerate(p)]
                                     for p in (p1,p2)])) 
                     for idx in [2,0,1,3]]
-        return [float(f'{magnitude:0.2f}') for magnitude in magnitudes]
+        return magnitudes
     
     def absolute_displacement(p1,p2):
         displacement = Toolbox.displacement(p1,p2)
@@ -155,7 +155,7 @@ class Toolbox:
         '''
         if len(val1) != len(val2):
             raise ValueError('Incompatible comparison between lists of unequal lengths')
-        return [float(f'{e1/e2:0.2f}') for e1,e2 in zip(val1, val2)]
+        return [e1/e2 for e1,e2 in zip(val1, val2)]
 
     def rotator(point:tuple|list, rotation_value:tuple|list, origin:tuple|list = [0,0,0]) -> list:
         '''
@@ -237,6 +237,32 @@ class Toolbox:
         if value_min > value_max:
             return int(value_min > value > value_max)
         return int(value_min < value < value_max)
+    
+    def value_discriminator(value:int|float, param:dict) -> int:
+        """Discriminates a value between two boundaries
+
+        Args:
+            value (int | float): The value
+            param (dict): A dictionary containing either 'lower_bound' key, 'upper_bound' key, both or neither
+
+        Returns:
+            int: 0 for No values, 1 for Maybe Values, 2 for Yes values
+        """
+        if all([x not in param for x in ('lower_bound','upper_bound')]):
+            return 2
+        
+        if 'lower_bound' not in param:
+            return value < param['upper_bound'] and 2 or 0
+        
+        if 'upper_bound' not in param:
+            return value > param['lower_bound'] and 2 or 0
+        
+        lower, upper = param['lower_bound'], param['upper_bound']
+
+        if lower < upper:
+            return lower < value < upper and 1 or upper < value and 2 or 0
+        if lower > upper:
+            return int(not(lower < value < upper))
 
 
 if __name__=='__main__':
