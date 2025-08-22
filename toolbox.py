@@ -56,7 +56,67 @@ class Toolbox:
                 v1[2]*v2[0]-v1[0]*v2[2], 
                 v1[0]*v2[1]-v1[1]*v2[0]]
     
-    def angle_vector(v1, v2) -> list:
+    def rot_matrix_to_elemental(R:np.ndarray) -> list:
+        """Turns a rotation matrix represented as an ndarray to 
+        angular elemental rotation in a list
+
+        Args:
+            R (np.ndarray): Rotation matrix
+
+        Returns:
+            list: Rotation around x,y,z axes respectively
+        """
+        to_deg = 180/np.pi
+        theta_x = np.arctan2(R[2][1],R[2][2]) * to_deg
+        theta_y = np.arctan2(
+            -R[2][0], np.sqrt( np.power(R[2][1],2) + np.power(R[2][2],2) ) 
+        ) * to_deg
+        theta_z = np.arctan2(R[1][0], R[0][0]) * to_deg
+
+        return [abs(theta_x), abs(theta_y), abs(theta_z)]
+
+    def find_rot_matrix(v1:list|tuple, v2:list|tuple) -> np.ndarray:
+        """Calculates the rotation matrix of two vectors
+        Adapted from: 
+        https://math.stackexchange.com/questions/180418/calculate-rotation-matrix-to-align-vector-a-to-vector-b-in-3d/476311#476311 
+
+        Args:
+            v1 (list | tuple): A 3-dimensional vector, with elements x,y,z.
+            v2 (list | tuple): A 3-dimensional vector, with elements x,y,z.
+
+        Returns:
+            np.ndarray: A 3x3 matrix represented by an ndarray as the rotation matrix
+        """
+        normalise_vector = Toolbox.normalise_vector2
+        vector_magnitude = Toolbox.vector_magnitude
+        dot_product = np.dot
+        cross_product = np.cross
+
+        for vector in v1, v2:
+            if len(vector) < 3:
+                vector.append(0)
+            if len(vector) > 3:
+                raise ValueError(f"Too many elements in vector {vector}; expected 3 elements at most!")
+        
+        v = cross_product(normalise_vector(v1),normalise_vector(v2))
+        s = vector_magnitude(v)
+
+        if np.isclose([s], [0], 1e-6):
+            return np.identity(3)
+        
+        c = dot_product(v1,v2)
+        vx = np.array(
+        [[0, -v[2], v[1]],
+         [v[2], 0, -v[0]],
+         [-v[1], v[0], 0]]
+        )
+        vx2 = dot_product(vx,vx)
+        i = np.identity(3)
+        R = i + vx + vx2 * (1-c)/(s*s)
+        
+        return R
+    
+    def angle_vector(v1:list, v2:list) -> list:
         '''
         Returns angle in the following order:
         around x-axis, y-axis, z-axis
@@ -66,29 +126,46 @@ class Toolbox:
          - v2: vector 2
         '''
         normalise_vector = Toolbox.normalise_vector2
-        dot_product = Toolbox.dot_product
-        nv1, nv2 = normalise_vector(v1), normalise_vector(v2)
-        angles = [np.arccos(dot_product(*[
-            normalise_vector([0 if idx==i else el 
-                                       for i,el 
-                                       in enumerate(vec)]) 
-            for vec in (nv1,nv2)])) * 180/np.pi
-            for idx in [0,1,2,3]]
+        dot_product = np.dot
+
+        normalised_vectors = []
+        for vector in (v1,v2):
+            try:
+                normalised_vectors.append(normalise_vector(vector))
+            except Exception as e:
+                raise Exception(f'Failed vector normalisation of {vector} ', e)
+        nv1, nv2 = normalised_vectors
+
+        yaw_pitch_roll = Toolbox.rot_matrix_to_elemental(Toolbox.find_rot_matrix(nv1,nv2))
+        general = np.arccos(dot_product(nv1,nv2)) * 180/np.pi
+        angles = yaw_pitch_roll + [general]
+
         return angles
         
-    def angle_point(p1, p2, p3) -> list:
-        '''
+    def angle_point(p1:list|tuple, p2:list|tuple, p3:list|tuple) -> list:
+        '''Calculates angle of lines p1-p2 and p2-p3, with p2 as the corner
         Returns angle in the following order:
-        around x-axis, y-axis, z-axis
+        around x-axis, y-axis, z-axis, and general angle
 
-        params:
-         - p1: point 1
-         - p2: point 2
-         - p3: point 3
+        Args:
+            p1 (list | tuple): x,y,z coordinates of point 1.
+            p2 (list | tuple): x,y,z coordinates of point 2.
+            p3 (list | tuple): x,y,z coordinates of point 3.
+        
+        Returns:
+            list: A list of angular values about each axis and general angle
         '''
         make_vector = Toolbox.make_vector
         angle_vector = Toolbox.angle_vector
-        v1, v2 = make_vector(p2,p1), make_vector(p2,p3)
+
+        vectors = []
+        for endpoints in ((p2,p1),(p2,p3)):
+            try:
+                vectors.append(make_vector(*endpoints))
+            except Exception as e:
+                raise Exception(f'Failed vector making of {endpoints} ', e)
+        v1, v2 = vectors
+
         return angle_vector(v1, v2)
 
     def displacement(p1:tuple|list, p2:tuple|list) -> list:
@@ -108,7 +185,12 @@ class Toolbox:
          A list describing the displacement of the two points in order of the axess
         '''
         make_vector = Toolbox.make_vector
-        vector = make_vector(p1,p2)
+
+        try:
+            vector = make_vector(p1,p2)
+        except Exception as e:
+            raise Exception(f'Failed vector making of {(p1,p2)} ', e)
+        
         return vector
 
     def distance(p1:tuple|list, p2:tuple|list) -> list:
@@ -131,11 +213,19 @@ class Toolbox:
         '''
         vector_magnitude = Toolbox.vector_magnitude
         make_vector = Toolbox.make_vector
-        magnitudes =[vector_magnitude(
-                        make_vector(*[[0 if idx==i else el 
-                                       for i,el in enumerate(p)]
-                                    for p in (p1,p2)])) 
-                    for idx in [2,0,1,3]]
+
+        magnitudes = []
+        for idx in (2,0,1,3):
+            tmp_point1 = [0 if idx==i else el for i,el in enumerate(p1)]
+            tmp_point2 = [0 if idx==i else el for i,el in enumerate(p2)]
+
+            try:
+                vector = make_vector(tmp_point1, tmp_point2)
+            except Exception as e:
+                raise Exception(f'Failed vector making of points {(tmp_point1,tmp_point2)} ', e)
+
+            magnitudes.append(vector_magnitude(vector))
+        
         return magnitudes
     
     def absolute_displacement(p1,p2):
@@ -213,7 +303,8 @@ class Toolbox:
         Returns:
          Top left and bottom right coordinates
         '''
-        return [bounding_point for bounding_point in zip(*[(min(element), max(element)) for element in zip(*points)][:2])]
+        return [bounding_point 
+                for bounding_point in zip(*[(min(element), max(element)) for element in zip(*points)][:2])]
     
     def bounding_box_size(*points):
         return 
@@ -263,7 +354,6 @@ class Toolbox:
             return lower < value < upper and 1 or upper < value and 2 or 0
         if lower > upper:
             return int(not(lower < value < upper))
-
 
 if __name__=='__main__':
     pass

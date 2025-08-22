@@ -3,7 +3,9 @@ import os
 import re
 import openpyxl
 
+import numpy as np
 import pandas as pd
+from models import CustomLandmark
 
 from openpyxl.utils import get_column_letter, column_index_from_string
 from openpyxl.styles.alignment import Alignment
@@ -28,22 +30,6 @@ def get_measurement_info(measurement_dict:dict) -> dict:
              + f'_{function_name}'\
              + f'_{result_index}'}\
             | params
-
-def apply_style(s:pd.DataFrame, parameters:dict=None) -> pd.DataFrame:
-    styler = pd.DataFrame('',s.index,s.columns)
-    style_list = (
-        'background-color:#f78686',
-        'background-color:#f7d586',
-        'background-color:#86f7a6',
-        
-    )
-    for param_idx, param in enumerate(parameters):
-        column_idx:int  = param_idx
-        comparison_series = [style_list[Toolbox.value_discriminator(x, param)] 
-                            for x 
-                            in s.iloc[:,column_idx]]
-        styler.iloc[:, param_idx] = comparison_series
-    return styler
 
 def apply_style(s:pd.DataFrame, parameters:dict=None) -> pd.DataFrame:
     styler = pd.DataFrame('',s.index,s.columns)
@@ -156,6 +142,109 @@ def write_to_excel(dataframe:pd.DataFrame, file_name:str, directory:str='.'):
         ws.column_dimensions[get_column_letter(col_id)].width = 20
     ws.freeze_panes = ws['B1']
     wb.save(file_name)
+
+def process_com_from_recording(recording:list[int,list[list],dict]) -> dict[dict,dict]:
+    """Calculates biomechanical statistics from recorded data for center of mass.
+    Center of mass is identified by the landmark with index 5000 in every landmark group
+
+    Args:
+        recording (list[int,list[list],dict]): Recording data
+
+    Raises:
+        ValueError: If index 5000 is not the center of mass
+
+    Returns:
+        dict[dict,dict]: The function returns a dictionary with two keys for two dictionaries:
+        - data:
+            - position_offsets: offsets of CoM position from average throughout recording in cm
+            - position_distances: distances of CoM position from average throughout recording in cm
+            - travel_offsets: offsets of CoM position from previous frame's position throughout recording in cm
+            - travel_distances: distances of CoM position from previous frame's position throughout recording in cm
+            - travel_vels: velocities of CoM from previous frame's position throughout recording in cm/s
+            - travel_speeds: speeds of CoM from previous frame's position throughout recording in cm/s
+        - info:
+            - time_per_frame: average delta time of frames from previous frame in s
+            - position_offset_std: standard deviation of CoM position from average in cm
+            - position_total_distance: total of CoM distance from average position in cm
+            - position_total_displacement: total of CoM displacement from average position in cm
+            - travel_total_distance: total of CoM travel distance (one frame to the next) in cm
+            - travel_total_displacement: total of CoM travel displacement (one frame to the next) in cm
+            - position_avg_vel: average of CoM velocity from average position in cm/s
+            - position_avg_speed: average of CoM speed from average position in cm/s
+            - travel_avg_vel: average of CoM travel velocity (one frame to the next) in cm/s
+            - travel_avg_speed: average of CoM travel speed (one frame to the next) in cm/s
+    """
+    template:list[CustomLandmark] = recording[0][1][0] # LANDMARK LIST
+    index_map = {landmark.idx:landmark.name for landmark in template}
+    result_data, result_info = dict(), dict()
+
+    try:
+        assert index_map[5000] == 'center of mass'
+    except AssertionError:
+        raise ValueError("Center of Mass not in expected index 5000")
+
+    all_timestamps = [record[0] for record in recording]
+    all_frame_durations = [
+        (all_timestamps[i]-all_timestamps[i-1]) / 1000 
+        for i in range(1,len(all_timestamps))
+    ]
+    average_frame_duration = np.mean(all_frame_durations)
+
+    com_data = [
+        np.array(record[1][0][-1].world[::2])*100 for record in recording
+    ]
+    com_avg = np.mean(com_data,0)
+
+    com_displacement = [(com - com_avg) for com in com_data]
+    com_distance = [
+        np.sqrt(sum([x**2 for x in displacement])) for displacement in com_displacement
+    ]
+    
+    com_std = np.std(com_displacement, 0)
+
+    com_total_distance = sum(com_distance)
+    com_total_displacement = sum(com_displacement)
+    
+    com_travel_displacement = [np.array([0.0,0.0])]+[
+        com_displacement[i] - com_displacement[i-1] for i in range(1, len(com_displacement))
+    ]
+    com_travel_distance = [0.0]+[
+        np.sqrt(sum([x**2 for x in displacement])) for displacement in com_travel_displacement
+    ]
+    
+    com_total_travel_displacement = sum(com_travel_displacement)
+    com_total_travel_distance = sum(com_travel_distance)
+    
+    com_travel_velocity = [np.array([0.0,0.0])]+[
+        displacement/average_frame_duration for displacement in com_travel_displacement
+    ]
+    com_travel_speed = [0.0]+[
+        distance/average_frame_duration for distance in com_travel_distance
+    ]
+
+    # ARRAYS
+    result_data["position_offsets"] = com_displacement
+    result_data["position_distances"] = com_distance 
+    result_data["travel_offsets"] = com_travel_displacement
+    result_data["travel_distances"] = com_travel_distance
+    result_data["travel_vels"] = com_travel_velocity
+    result_data["travel_speeds"] = com_travel_speed
+    
+    # SINGULAR VALUES
+    result_info["time_per_frame"] = average_frame_duration
+    result_info["position_offset_std"] = com_std
+
+    result_info["position_total_distance"] = com_total_distance
+    result_info["position_total_displacement"] = com_total_displacement
+    result_info["travel_total_distance"] = com_total_travel_distance
+    result_info["travel_total_displacement"] = com_total_travel_displacement
+    
+    result_info["position_avg_vel"] = com_total_displacement/(average_frame_duration*len(com_displacement))
+    result_info["position_avg_speed"] = com_total_distance/(average_frame_duration*len(com_distance))
+    result_info["travel_avg_vel"] = np.mean(com_travel_velocity,0)
+    result_info["travel_avg_speed"] = np.mean(com_travel_speed)
+
+    return {'info':result_info,'data':result_data}
 
 if __name__ == '__main__':
     pass
