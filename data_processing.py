@@ -47,27 +47,28 @@ def apply_style(s:pd.DataFrame, parameters:dict=None) -> pd.DataFrame:
         styler.iloc[:, param_idx] = comparison_series
     return styler
 
-def recording_info_to_pd_dataframe(recording:list[int,list[list],list[dict]]) -> pd.DataFrame:
+def recording_info_to_pd_dataframe(recording: dict[int,list[dict[str,int]]]) -> pd.DataFrame:
     """Converts the recorded data from the loop to a dataframe
 
     Args:
-        recording (list[int,list[list],list[dict]]): A recording which is a list of lists containing timestamp
-                                                     landmark_list, and measurement dictionary
+        recording (dict[int,list[dict[str,int]]]): A recording which is a dictionary 
+        with timestamp as keys and a list of dictionaries with keys: 'landmark','measure'
 
     Returns:
         pd.DataFrame: Dataframe with style applied
     """
-    recording = [frame for frame in recording if len(frame[1])>0] # Make sure all data are safe
+    # recording = [frame for frame in recording if len(frame[1])>0] # Make sure all data are safe
 
     # ENSURE NO DUPLICATES
-    timestamps = [frame_info[0] for frame_info in recording]
-    duplicated_idx = [t_idx for t_idx, timestamp in enumerate(timestamps) 
-                        if timestamps.count(timestamp)>1]
-    duplicated_idx = [duplicated_idx[i:i+2][-1] for i in range(0,len(duplicated_idx),2)]
-    recording = [frame for idx, frame in enumerate(recording) if idx not in duplicated_idx]
+    # timestamps = [frame_info[0] for frame_info in recording]
+    # duplicated_idx = [t_idx for t_idx, timestamp in enumerate(timestamps) 
+    #                     if timestamps.count(timestamp)>1]
+    # duplicated_idx = [duplicated_idx[i:i+2][-1] for i in range(0,len(duplicated_idx),2)]
+    # recording = [frame for idx, frame in enumerate(recording) if idx not in duplicated_idx]
 
     # GET TIMESTAMPS
-    recorded_timestamps = {'timestamp_ms':[(frame_info[0]-recording[0][0])/1000 for frame_info in recording]}
+    first_timestamp = list(recording.keys())
+    recorded_timestamps = {'timestamp_ms':[(frame_info[0]-recording[0][0]) for frame_info in recording]}
     timestamps_df = pd.DataFrame(recorded_timestamps)
 
     # GET LANDMARK INFOMATION
@@ -81,7 +82,8 @@ def recording_info_to_pd_dataframe(recording:list[int,list[list],list[dict]]) ->
     landmarks_df = pd.DataFrame(landmarks_data)
 
     # GET MEASUREMENTS
-    recorded_measurements = [frame_info[2][0] for frame_info in recording]
+    recorded_measurements = [measurement for frame_info in recording
+                             if len((measurement:=frame_info[2][0]))>0] + [[]]
     measurements_info = [m_info
                         for measurement in recorded_measurements[0]
                         if (m_info:=get_measurement_info(measurement)) is not None]

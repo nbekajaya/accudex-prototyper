@@ -379,9 +379,51 @@ HIMAT_WALK = {
          'indices':(13,30),
          'space':'screen',
          'use_multi_calibrated':0,
+         'params':{'do_draw':True}},
+        {'function_name':'distance',
+         'indices':(13,30),
+         'space':'screen',
+         'use_multi_calibrated':1,
+         'params':{'do_draw':True}},
+        {'function_name':'distance', #LIVE DISTANCE
+        'indices':(13,30),
+        'space':'screen',
+        'use_calibrated':False,
+        'params':{'do_draw':True}},
+        {'function_name':'compare',
+         'indices':(2,0),
          'params':{
-             'check_index':1}}
+             'check_index':3,
+             'lower_bound':0.9,
+             'upper_bound':1.1,
+         }},
+         {'function_name':'compare',
+         'indices':(2,1),
+         'params':{
+             'check_index':3,
+             'lower_bound':0.9,
+             'upper_bound':1.1}}
     ]
 }
+
+HIMAT_WALK_BACKWARDS = {
+    'protocol_name':'HIMAT BACKWARDS WALK',
+    'protocol_time_seconds':1000,
+    'protocol_state_condition':None,
+    'protocol_measurements':[
+        {'function_name':'displacement',
+         'indices':(11,12),
+         'space':'screen',
+         'use_calibrated':False,
+         'params':{
+             'check_index':0,
+             'upper_bound':0}},
+        *HIMAT_WALK['protocol_measurements']
+    ]
+}
+
+
+
+
 
 
