@@ -232,7 +232,7 @@ class Toolbox:
         displacement = Toolbox.displacement(p1,p2)
         return [abs(element) for element in displacement]
 
-    def compare(val1:tuple|list, val2:tuple|list) -> list:
+    def compare_ratio(val1:tuple|list, val2:tuple|list) -> list:
         '''
         Compares elements between two values as a ratio
 
@@ -245,7 +245,30 @@ class Toolbox:
         '''
         if len(val1) != len(val2):
             raise ValueError('Incompatible comparison between lists of unequal lengths')
-        return [e1/e2 for e1,e2 in zip(val1, val2)]
+        
+        result = []
+
+        for e1, e2 in zip(val1,val2):
+            if float(e2) == 0.0:
+                result.append(0)
+            result.append(e1/e2)
+
+        return result
+    
+    def compare_substract(val1:tuple|list, val2:tuple|list) -> list:
+        '''
+        Compares elements between two values as a ratio
+
+        Params:
+         - val1(any): A list containing values
+         - val2(any): A list containing values 
+        
+        Returns:
+         A list which are ratios of elements of val1 to elements of val 2
+        '''
+        if len(val1) != len(val2):
+            raise ValueError('Incompatible comparison between lists of unequal lengths')
+        return [e2-e1 for e1,e2 in zip(val1,val2)]
 
     def rotator(point:tuple|list, rotation_value:tuple|list, origin:tuple|list = [0,0,0]) -> list:
         '''

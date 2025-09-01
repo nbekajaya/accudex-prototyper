@@ -568,6 +568,7 @@ class LandmarkContainer:
 
         if multi_maxed_out:
             self.multi_calibrated_groups = []
+            return
         
         self.multi_calibrated_groups += [deepcopy(self.landmark_list)]
         self.calibration_time = timestamp
@@ -861,13 +862,16 @@ class LandmarkContainer:
                                 +params['default_names'])
             
         if isinstance(test_value,str):
-            render_text(test_value, local_position, color=color1)
-            return
-        
-        measure_color = colorise_bounds(test_value, params)
+            measure_color = FontColorRed
+        else:
+            measure_color = colorise_bounds(test_value, params)
 
         for element in [use_name, test_value]:
-            render_text(element, local_position, color=measure_color)
+            render_text(element, 
+                        local_position, 
+                        displacer=(0,30),
+                        color=measure_color, 
+                        font_thickness=2)
         
         idx += 1
         
@@ -932,12 +936,12 @@ class LandmarkContainer:
             except IndexError:
                 pass
 
-        if hasattr(self, 'calibration_time'):
-            if (current_timestamp - 2500) < self.calibration_time:
-                self.renderer.render_text(f'Calibrated at {self.calibration_time} ms',
-                                          debug_draw_position,
-                                          color = FontColorYellow,
-                                          font_thickness=2)
+        # if hasattr(self, 'calibration_time'):
+        #     if (current_timestamp - 2500) < self.calibration_time:
+        #         self.renderer.render_text(f'Calibrated at {self.calibration_time} ms',
+        #                                   debug_draw_position,
+        #                                   color = FontColorYellow,
+        #                                   font_thickness=2)
 
         # Drawing measurement stuff
         if draw_measurements and hasattr(self,'measured'):
@@ -946,8 +950,8 @@ class LandmarkContainer:
                 for measurement in measurement_group:
                     try:
                         self.__draw_measurement(measurement,
-                                                (10,100),
-                                                (0,25),
+                                                (10,130),
+                                                (0,35),
                                                 drawn_measurement,
                                                 *measurement_color_range)
                     except Exception as e:
@@ -1060,24 +1064,38 @@ class LandmarkContainer:
     def __parse_measure(self, group_idx:int, instruction:dict):
         sanitise_arguments = self.__sanitise_arguments
 
-        # def get_landmark_from_index(landmark_group, indices):
-        #     lookup = self.landmark_idx_map
-        #     landmarks = []
+        def get_landmark_from_index(landmark_group, indices):
+            lookup = self.landmark_idx_map
+            landmarks = []
 
-        #     for idx in indices:
-        #         if isinstance(idx, int):
-        #             try:
-        #                 landmarks += [landmark_group\
-        #                               [lookup.index(idx)]]
-        #                 continue
-        #             except ValueError:
-        #                 pass
-        #         if isinstance(idx, str):
-        #             landmarks += [idx]
-        #             continue
-        #         landmarks += [None]
+            for idx in indices:
+                if isinstance(idx, int):
+                    try:
+                        landmarks += [landmark_group\
+                                      [lookup.index(idx)]]
+                        continue
+                    except ValueError:
+                        pass
+                if isinstance(idx, str):
+                    landmarks += [idx]
+                    continue
+                landmarks += [None]
 
-        #     return landmarks
+            return landmarks
+        
+        def get_landmark_names(indices):
+            lookup = self.landmark_idx_map
+            name_lookup = self.landmark_names
+            names = []
+
+            for idx in indices:
+                if not isinstance(idx, (str,int)):
+                    raise Exception("__parse_measure: failure to retrieve landmark name")
+                if isinstance(idx, str):
+                    names.append(idx.upper())
+                    continue
+                names.append(name_lookup[lookup.index(idx)])
+            return names
 
         function_name = instruction['function_name']
         indices = instruction['indices']
@@ -1090,7 +1108,7 @@ class LandmarkContainer:
             raise AttributeError(f'{function_name} is not a measure method')
         # print(f'__parse_measure: measurement tool got! {use_function}')
 
-        if instruction['function_name'] == 'compare':
+        if 'compare' in instruction['function_name']:
             try:
                 measured_values = [self.measured[group_idx][idx]['result'] 
                                    for idx 
@@ -1111,10 +1129,7 @@ class LandmarkContainer:
         if 'use_multi_calibrated' not in instruction:
             instruction['use_multi_calibrated'] = False
 
-        instruction['params']['default_names'] = [
-            self.landmark_names[self.landmark_idx_map.index(idx)] 
-            for idx in indices
-        ]
+        instruction['params']['default_names'] = get_landmark_names(indices)
         # print(f'__parse_measure: default_names GOT! {instruction['params']['default_names']}')
         
         use_calibrated = instruction['use_calibrated']
@@ -1131,7 +1146,6 @@ class LandmarkContainer:
                 return instruction
             use_landmark_group = self.calibrated_groups[group_idx]
         # print(f'__parse_measure: use_calibrated HANDLED! {use_calibrated}')
-
         
         if not (use_multi_calibrated is False):
             if not hasattr(self,'multi_calibrated_groups'):
@@ -1145,7 +1159,7 @@ class LandmarkContainer:
         
         space = instruction['space']
 
-        landmarks = [use_landmark_group[self.landmark_idx_map.index(idx)] for idx in indices]
+        landmarks = get_landmark_from_index(use_landmark_group, indices)
         # print(f'__parse_measure: landmarks at indices {indices} fetched! {landmarks}')
         
         try:
@@ -1189,7 +1203,7 @@ class LandmarkContainer:
 
         try:
             assert len(sum(self.landmark_list,[]))>0
-        except:
+        except AssertionError:
             return
 
         for group_idx in range(len(self.landmark_list)):
