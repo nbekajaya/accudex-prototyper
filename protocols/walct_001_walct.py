@@ -5,8 +5,8 @@ import os
 SCRIPT_DIR = os.path.realpath(__file__)
 USE_SCRIPT_DIR = SCRIPT_DIR
 while not (os.path.split(USE_SCRIPT_DIR)[-1].lower() == 'accudex-prototyper'):
-    if USE_SCRIPT_DIR == '/':
-        break
+    if USE_SCRIPT_DIR == '/' or len(USE_SCRIPT_DIR)<2:
+        raise RuntimeError("Failure to locate 'accudex-prototyper' folder, please ensure it exists on the device")
     USE_SCRIPT_DIR = os.path.dirname(USE_SCRIPT_DIR)
 print(USE_SCRIPT_DIR)
 sys.path.append(USE_SCRIPT_DIR)
@@ -102,15 +102,12 @@ while running:
     # RECEIVING AND PROCESSING IMAGE
     feed_image = next(feed)
     pose.detect_async(feed_image, current_time)
-    # hand.detect_async(feed_image, current_time)
 
     if not hasattr(pose, 'landmark_list'):
         continue
 
     real_time = int(1000*time.time()) - start_time
-
     pose.set_display(feed_image, flip=True)    
-    # pose.renderer.fill_image((50,40,130))
     
     if current_time > check_time:
         try:
@@ -213,18 +210,12 @@ while running:
         scale=1.2, 
         font_thickness=2
     )
-        
 
     # FINAL DRAWING
     use_image = pose.draw(real_time, 
                           draw_measurements=True, 
                           attributes='',
                           flipped=True)
-    
-    # hand.set_display(use_image, flip=True)
-    # use_image = hand.draw(real_time, 
-    #                       connector='bone', 
-    #                       flipped=True)
     
     # CONVERTING TO CV AND DISPLAYING IN PYGAME WINDOW
     current_window_size = pygame.display.get_window_size()

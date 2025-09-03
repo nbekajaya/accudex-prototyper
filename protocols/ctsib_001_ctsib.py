@@ -1,11 +1,3 @@
-import pygame
-import style
-import time
-
-import matplotlib.pyplot as plt
-import measurement_protocols as mprot
-import numpy as np
-import pandas as pd
 import sys
 import os
 
@@ -13,12 +5,10 @@ import os
 SCRIPT_DIR = os.path.realpath(__file__)
 USE_SCRIPT_DIR = SCRIPT_DIR
 while not (os.path.split(USE_SCRIPT_DIR)[-1].lower() == 'accudex-prototyper'):
-    if USE_SCRIPT_DIR == '/':
-        break
+    if USE_SCRIPT_DIR == '/' or len(USE_SCRIPT_DIR)<2:
+        raise RuntimeError("Failure to locate 'accudex-prototyper' folder, please ensure it exists on the device")
     USE_SCRIPT_DIR = os.path.dirname(USE_SCRIPT_DIR)
-print(USE_SCRIPT_DIR)
 sys.path.append(USE_SCRIPT_DIR)
-# quit()
 
 import pygame
 import style
